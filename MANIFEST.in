@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include requirements.txt
+include paper.md
+include paper.bib
+include CITATION.cff
+recursive-include docs *
+recursive-include tests *

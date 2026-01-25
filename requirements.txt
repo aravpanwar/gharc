@@ -1,0 +1,19 @@
+certifi==2026.1.4
+charset-normalizer==3.4.4
+click==8.3.1
+-e git+https://github.com/aravpanwar/gharc.git@26ec1316f372fda2e523880e433740e621bf2655#egg=gharc
+idna==3.11
+iniconfig==2.3.0
+mock==5.2.0
+numpy==2.4.1
+packaging==26.0
+pandas==3.0.0
+pluggy==1.6.0
+pyarrow==23.0.0
+Pygments==2.19.2
+pytest==9.0.2
+python-dateutil==2.9.0.post0
+requests==2.32.5
+six==1.17.0
+tqdm==4.67.1
+urllib3==2.6.3
