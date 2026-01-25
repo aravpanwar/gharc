@@ -20,7 +20,7 @@ Please open an issue on GitHub if you encounter:
 ## Development Setup
 ```bash
 # Clone and install dependencies
-git clone [https://github.com/YOUR_USERNAME/gharc.git](https://github.com/YOUR_USERNAME/gharc.git)
+git clone [https://github.com/aravpanwar/gharc.git](https://github.com/aravpanwar/gharc.git)
 cd gharc
 python3 -m venv venv
 source venv/bin/activate
