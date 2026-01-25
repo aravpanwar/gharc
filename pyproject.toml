@@ -9,7 +9,7 @@ description = "A stream-processing tool for GitHub Archive data filtering."
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-  { name = "Arav Panwar", email = "arav@example.com" },
+  { name = "Arav Panwar", email = "aravpanwar@outlook.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/yourusername/gharc"
-"Bug Tracker" = "https://github.com/yourusername/gharc/issues"
+"Homepage" = "https://github.com/aravpanwar/gharc"
+"Bug Tracker" = "https://github.com/aravpanwar/gharc/issues"
 
 [project.scripts]
 gharc = "gharc.cli:main"
