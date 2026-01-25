@@ -23,7 +23,7 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 
 **Ideal for:**
 - Academic research on Open Source Software (OSS).
-- "Moonshot" scale data mining on consumer hardware.
+- Large scale data mining on consumer hardware.
 - Creating custom datasets for specific organizations or ecosystems.
 
 ---
@@ -155,7 +155,7 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
   author = {Panwar, Arav},
   title = {gharc: A Stream-Processing Tool for GitHub Archive Data},
   year = {2026},
-  url = {[https://github.com/YOUR_USERNAME/gharc](https://github.com/YOUR_USERNAME/gharc)}
+  url = {[https://github.com/aravpanwar/gharc](https://github.com/aravpanwar/gharc)}
 }
 
 ```
@@ -165,7 +165,3 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
-
-```
-
-```
