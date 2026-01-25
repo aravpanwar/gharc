@@ -8,7 +8,7 @@ tags:
   - stream processing
 authors:
   - name: Arav Panwar
-    orcid: 0000-0000-0000-0000 # Replace with your ORCID if you have one
+    orcid: 0009-0009-3013-5970 # Replace with your ORCID if you have one
     affiliation: 1
 affiliations:
  - name: Independent Researcher, Hyderabad, India
