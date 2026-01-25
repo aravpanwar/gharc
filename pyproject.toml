@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gharc"
+version = "0.1.0"
+description = "A stream-processing tool for GitHub Archive data filtering."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+  { name = "Arav Panwar", email = "arav@example.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "requests>=2.28.0",
+    "click>=8.0.0",
+    "pandas>=2.0.0",
+    "pyarrow>=12.0.0",  # For Parquet support
+    "tqdm>=4.65.0",     # For progress bars
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/gharc"
+"Bug Tracker" = "https://github.com/yourusername/gharc/issues"
+
+[project.scripts]
+gharc = "gharc.cli:main"
+
+[tool.setuptools.package-data]
+gharc = ["py.typed"]

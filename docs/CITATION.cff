@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Panwar"
+  given-names: "Arav"
+title: "gharc: A Stream-Processing Tool for GitHub Archive Data"
+version: 0.1.0
+date-released: 2026-01-25
+url: "https://github.com/yourusername/gharc"
