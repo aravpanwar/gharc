@@ -1,8 +1,3 @@
-Here is a professional, comprehensive `README.md` ready for your GitHub repository. It includes badges, installation instructions, advanced usage examples, and citation details for your JOSS submission.
-
-**File:** `README.md`
-
-```markdown
 # gharc: GitHub Archive Stream-Processor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
