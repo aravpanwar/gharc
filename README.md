@@ -48,7 +48,7 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 
 ### Install from Source
 ```bash
-git clone [https://github.com/YOUR_USERNAME/gharc.git](https://github.com/YOUR_USERNAME/gharc.git)
+git clone [https://github.com/aravpanwar/gharc.git](https://github.com/aravpanwar/gharc.git)
 cd gharc
 python3 -m venv venv
 source venv/bin/activate
