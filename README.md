@@ -112,7 +112,7 @@ gharc download \
 
 ##  Automating Bulk Downloads
 
-For "Moonshot" datasets spanning years, use the Python API or the included orchestrator script to handle month-by-month processing.
+For extremely large datasets spanning years, use the Python API or the included orchestrator script to handle month-by-month processing.
 
 **Example `orchestrator.py` snippet:**
 
