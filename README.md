@@ -26,6 +26,8 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 - Large scale data mining on consumer hardware.
 - Creating custom datasets for specific organizations or ecosystems.
 
+![Architecture: GHArchive HTTPS to thread pool to resumable download to temp file to streaming decode and filter to DataWriter to output file.](paper/figures/architecture.png)
+
 ---
 
 ## Key Features
@@ -37,6 +39,23 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
     * Optimized "Fast String Check" (zero-copy filtering) to skip irrelevant data.
     * Optional `orjson` support for 3-5x faster parsing.
 * **Parquet Native:** Outputs columnar data ready for Pandas, Spark, or Polars, often reducing file size by 90% compared to JSON.
+
+---
+
+## Performance
+
+Measured on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a residential connection in Hyderabad, India. Reproducible scripts in [`benchmarks/`](benchmarks/).
+
+A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apache/spark`:
+
+| Workers | Wall-clock | Hours/sec | Spark events | Peak RSS |
+|---|---|---|---|---|
+| 1 | 76.0 s | 0.079 | 14 | 94.2 MB |
+| 4 | 58.1 s | 0.103 | 14 | 106.7 MB |
+
+Both runs recovered the same events, so concurrency does not affect output. Peak RSS stays below 110 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection.
+
+The same six-hour window comprises about 1.2 GB of compressed source on the GHArchive side, while the filtered Parquet output is 53 KB. That is a storage saving of roughly 22,000 to 1, and at no point does peak local disk exceed the size of a single in-flight temporary file (about 150 MB).
 
 ---
 
@@ -153,6 +172,8 @@ pytest tests/
 ---
 
 ## Citation
+
+The accompanying paper is at [`paper/paper.pdf`](paper/paper.pdf) and is rebuilt automatically on every push by the [Paper CI workflow](.github/workflows/paper.yml).
 
 If you use `gharc` in your research, please cite it using the metadata in `CITATION.cff` or as follows:
 
