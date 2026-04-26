@@ -1,0 +1,9 @@
+%% gharc stream-and-filter architecture.
+%% Render with mermaid-cli: mmdc -i architecture.mmd -o architecture.png -b transparent
+flowchart LR
+    A["GHArchive<br/>HTTPS (per hour)"] --> B["Thread pool<br/>(N workers)"]
+    B --> C["Resumable<br/>download"]
+    C --> D["Temp .json.gz<br/>(deleted after)"]
+    D --> E["Streaming<br/>decode + filter"]
+    E --> F["DataWriter<br/>(ParquetWriter / JSONL)"]
+    F --> G["Output file<br/>on disk"]
