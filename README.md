@@ -5,9 +5,9 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**Process 10TB of GitHub history on a standard laptop.**
+**Mine the GitHub Archive on a standard laptop.**
 
-`gharc` is a command-line tool and Python library that allows researchers to filter, process, and analyze the massive [GitHub Archive](https://www.gharchive.org/) dataset without requiring terabytes of local storage. It streams data directly from the source, filters it in-memory, and saves only the signal you care about.
+`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset on consumer hardware. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by a single in-flight download (about 150 MB) regardless of how long a window you process.
 
 ---
 
@@ -16,10 +16,10 @@
 The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis requires either massive local storage or expensive cloud warehousing (BigQuery).
 
 `gharc` solves this by implementing a **Stream-and-Filter** architecture:
-1.  **Streaming:** Downloads compressed chunks to a temporary buffer (~50MB).
-2.  **Filtering:** Extracts only events matching your criteria (e.g., specific repos or users).
-3.  **Indexing:** writes highly compressed **Parquet** or **JSONL** files.
-4.  **Cleanup:** Immediately deletes the raw chunk, ensuring disk usage never spikes.
+1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
+2.  **Filtering:** Extracts only events matching your criteria (e.g., specific repos or event types).
+3.  **Writing:** Streams matching events into a single **Parquet** or **JSONL** file via `pyarrow.ParquetWriter` for true append.
+4.  **Cleanup:** Deletes the temporary download immediately after, so disk usage never accumulates.
 
 **Ideal for:**
 - Academic research on Open Source Software (OSS).
@@ -57,11 +57,10 @@ pip install -e .
 
 ### Optional Performance Boost
 
-For maximum speed, install `orjson`. `gharc` will automatically detect and use it.
+For maximum speed, install with the `fast` extra. `gharc` detects and uses `orjson` automatically when available.
 
 ```bash
-pip install orjson
-
+pip install -e ".[fast]"
 ```
 
 ---
@@ -113,22 +112,29 @@ gharc download \
 
 ##  Automating Bulk Downloads
 
-For extremely large datasets spanning years, use the Python API or the included orchestrator script to handle month-by-month processing.
+For long date ranges, the included [`examples/orchestrator.py`](examples/orchestrator.py) script runs `gharc` month by month so each year produces one Parquet file per month rather than one giant output:
 
-**Example `orchestrator.py` snippet:**
+```bash
+python examples/orchestrator.py \
+    --start 2023-01-01 \
+    --end 2024-01-01 \
+    --repos "apache/spark,pandas-dev/pandas" \
+    --output-dir ./gharc_out \
+    --workers 4
+```
 
-```python
-import subprocess
-# Loop through months and process one by one to keep file sizes manageable
-cmd = [
-    "gharc", "download",
-    "--start", "2020-01-01",
-    "--end", "2020-02-01",
-    "--repos", "kubernetes/kubernetes",
-    "--output", "k8s_2020_01.parquet"
-]
-subprocess.run(cmd)
+---
 
+## Repository Layout
+
+```
+gharc/
+├── src/gharc/        # Library + CLI entry point
+├── tests/            # pytest test suite
+├── benchmarks/       # Reproducible runs that back the performance claims
+├── examples/         # Driver scripts (e.g. month-by-month orchestrator)
+├── paper/            # paper.md, paper.bib, figures (the JOSS submission)
+└── CITATION.cff      # GitHub-detectable citation metadata
 ```
 
 ---
@@ -153,7 +159,7 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
 ```bibtex
 @software{gharc2026,
   author = {Panwar, Arav},
-  title = {gharc: A Stream-Processing Tool for GitHub Archive Data},
+  title = {gharc: A stream-and-filter tool for the GitHub Archive on consumer hardware},
   year = {2026},
   url = {https://github.com/aravpanwar/gharc}
 }
