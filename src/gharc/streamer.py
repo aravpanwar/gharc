@@ -133,10 +133,8 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
 def process_range(start, end, repos, event_types, output, workers):
     writer = DataWriter(output)
     timestamps = list(date_range(start, end))
-    
-    safe_workers = min(workers, 4)
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=safe_workers) as executor:
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_time = {
             executor.submit(process_single_hour, ts, repos, event_types): ts 
             for ts in timestamps

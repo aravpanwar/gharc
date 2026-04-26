@@ -22,11 +22,14 @@ def parse_date(date_str: str) -> datetime:
         raise ValueError(f"Invalid date format: {date_str}. Use YYYY-MM-DD or YYYY-MM-DD-HH")
 
 def date_range(start: datetime, end: datetime) -> Iterator[datetime]:
-    """Yields hourly datetimes from start to end."""
+    """Yields hourly datetimes in [start, end). End is exclusive.
+
+    Use --end 2024-02-01 to cover all of January 2024.
+    """
     current = start.replace(minute=0, second=0, microsecond=0)
     end_rounded = end.replace(minute=0, second=0, microsecond=0)
-    
-    while current < end_rounded + timedelta(hours=1):
+
+    while current < end_rounded:
         yield current
         current += timedelta(hours=1)
 
