@@ -32,5 +32,6 @@ dependencies = [
 [project.scripts]
 gharc = "gharc.cli:main"
 
-[tool.setuptools.package-data]
-gharc = ["py.typed"]
+[project.optional-dependencies]
+fast = ["orjson>=3.9.0"]
+test = ["pytest>=7.0"]

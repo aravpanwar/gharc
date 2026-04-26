@@ -1,13 +1,14 @@
 # Python
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 *.so
 .Python
-env/
+
+# Build artefacts
 build/
-develop-eggs/
 dist/
+develop-eggs/
 downloads/
 eggs/
 .eggs/
@@ -20,18 +21,41 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual Env
+# Virtual environments
 venv/
+.venv/
+env/
 .env
 
-# IDEs
+# Editors / IDEs
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Project Specific
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage / type-check caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# gharc output (do not commit downloaded archives or filtered data)
 *.json.gz
 *.parquet
 *.jsonl
 data/
 output/
+gharc_out/

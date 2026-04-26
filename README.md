@@ -1,7 +1,7 @@
 # gharc: GitHub Archive Stream-Processor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://github.com/YOUR_USERNAME/gharc/actions/workflows/test.yml/badge.svg)](https://github.com/YOUR_USERNAME/gharc/actions)
+[![Tests](https://github.com/aravpanwar/gharc/actions/workflows/test.yml/badge.svg)](https://github.com/aravpanwar/gharc/actions)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -48,12 +48,11 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 
 ### Install from Source
 ```bash
-git clone [https://github.com/aravpanwar/gharc.git](https://github.com/aravpanwar/gharc.git)
+git clone https://github.com/aravpanwar/gharc.git
 cd gharc
 python3 -m venv venv
 source venv/bin/activate
 pip install -e .
-
 ```
 
 ### Optional Performance Boost
@@ -71,12 +70,13 @@ pip install orjson
 
 ### Basic Command
 
-Download all activity for a specific repository during a specific time range.
+Download all activity for a specific repository over a one-day window.
+Note that `--end` is exclusive, so this covers all 24 hours of 2024-01-01.
 
 ```bash
 gharc download \
-    --start 2024-01-01-00 \
-    --end 2024-01-01-23 \
+    --start 2024-01-01 \
+    --end 2024-01-02 \
     --repos "apache/spark" \
     --output spark_data.parquet
 
@@ -85,11 +85,12 @@ gharc download \
 ### Advanced Filtering
 
 Filter for multiple repositories and specific event types (e.g., only Pull Requests and Pushes).
+This covers all of June 2023 (June 1 inclusive through July 1 exclusive).
 
 ```bash
 gharc download \
     --start 2023-06-01 \
-    --end 2023-06-30 \
+    --end 2023-07-01 \
     --repos "apache/spark, pandas-dev/pandas, pytorch/pytorch" \
     --event-types "PullRequestEvent, PushEvent" \
     --output oss_summer_2023.parquet \
@@ -101,8 +102,8 @@ gharc download \
 
 | Argument | Description | Example |
 | --- | --- | --- |
-| `--start` | Start date (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-01-01` |
-| `--end` | End date (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-01-31` |
+| `--start` | Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-01-01` |
+| `--end` | End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-02-01` |
 | `--repos` | Comma-separated list of repositories to keep | `apache/spark,tensorflow/tensorflow` |
 | `--event-types` | Comma-separated list of GHArchive event types | `WatchEvent,ForkEvent` |
 | `--output` | Output filename (`.parquet` or `.jsonl`) | `data.parquet` |
@@ -134,14 +135,13 @@ subprocess.run(cmd)
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](https://www.google.com/search?q=CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on the process for submitting pull requests.
 
 **Running Tests:**
 
 ```bash
-pip install pytest mock
+pip install -e ".[test]"
 pytest tests/
-
 ```
 
 ---
@@ -155,7 +155,7 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
   author = {Panwar, Arav},
   title = {gharc: A Stream-Processing Tool for GitHub Archive Data},
   year = {2026},
-  url = {[https://github.com/aravpanwar/gharc](https://github.com/aravpanwar/gharc)}
+  url = {https://github.com/aravpanwar/gharc}
 }
 
 ```
@@ -164,7 +164,7 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 Created by Arav Panwar
 [aravpanwar.com](https://www.aravpanwar.com)

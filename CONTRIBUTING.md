@@ -20,9 +20,14 @@ Please open an issue on GitHub if you encounter:
 ## Development Setup
 ```bash
 # Clone and install dependencies
-git clone [https://github.com/aravpanwar/gharc.git](https://github.com/aravpanwar/gharc.git)
+git clone https://github.com/aravpanwar/gharc.git
 cd gharc
 python3 -m venv venv
 source venv/bin/activate
-pip install -e .
-pip install pytest mock
+pip install -e ".[test]"
+```
+
+## Running Tests
+```bash
+pytest tests/
+```
