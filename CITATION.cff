@@ -1,9 +1,24 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
+type: software
+title: "gharc: A stream-and-filter tool for the GitHub Archive on consumer hardware"
+abstract: >-
+  gharc filters the GitHub Archive on consumer hardware by streaming
+  each hourly archive through memory and writing only matching events
+  to Parquet or JSONL. Peak local storage stays bounded by a single
+  in-flight download regardless of the time range processed.
 authors:
-- family-names: "Panwar"
-  given-names: "Arav"
-title: "gharc: A Stream-Processing Tool for GitHub Archive Data"
+  - family-names: Panwar
+    given-names: Arav
+    orcid: https://orcid.org/0009-0009-3013-5970
 version: 0.1.0
-date-released: 2026-01-25
-url: "https://github.com/aravpanwar/gharc"
+date-released: 2026-04-26
+license: MIT
+repository-code: https://github.com/aravpanwar/gharc
+keywords:
+  - github
+  - mining-software-repositories
+  - msr
+  - stream-processing
+  - parquet
+  - python
