@@ -3,6 +3,7 @@ import requests
 import gzip
 import json
 import concurrent.futures
+import threading
 import time
 import os
 import tempfile
@@ -21,6 +22,8 @@ try:
 except ImportError:
     HAS_ORJSON = False
 
+_thread_local = threading.local()
+
 def get_robust_session():
     """Creates a requests session with retry logic."""
     session = requests.Session()
@@ -33,6 +36,14 @@ def get_robust_session():
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
+    return session
+
+def _session_for_thread() -> requests.Session:
+    # One session per worker thread so connection pooling actually kicks in.
+    session = getattr(_thread_local, "session", None)
+    if session is None:
+        session = get_robust_session()
+        _thread_local.session = session
     return session
 
 def download_resumable(url: str, temp_path: str, session: requests.Session) -> bool:
@@ -80,8 +91,8 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
     else:
         fast_tokens = (repos if repos else []) + (event_types if event_types else [])
         
-    session = get_robust_session()
-    
+    session = _session_for_thread()
+
     fd, temp_path = tempfile.mkstemp(suffix=".json.gz")
     os.close(fd)
     

@@ -3,7 +3,7 @@ __version__ = "0.1.0"
 from .filters import passes_filters, fast_string_check
 from .storage import DataWriter
 from .streamer import process_range
-from .utils import parse_date, date_range, get_url_for_time
+from .utils import parse_date, date_range, get_url_for_time, setup_logging
 
 __all__ = [
     "__version__",
@@ -14,4 +14,5 @@ __all__ = [
     "parse_date",
     "date_range",
     "get_url_for_time",
+    "setup_logging",
 ]

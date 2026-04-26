@@ -3,13 +3,20 @@ import logging
 from datetime import datetime, timedelta
 from typing import Iterator
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s: %(message)s',
-    datefmt='%H:%M:%S'
-)
 logger = logging.getLogger("gharc")
+
+
+def setup_logging(level: int = logging.INFO) -> None:
+    """Attach a console handler to the gharc logger. Safe to call twice."""
+    if logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(
+        '[%(asctime)s] %(levelname)s: %(message)s',
+        datefmt='%H:%M:%S',
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(level)
 
 def parse_date(date_str: str) -> datetime:
     """Parses YYYY-MM-DD or YYYY-MM-DD-HH"""

@@ -1,13 +1,13 @@
 # src/gharc/cli.py
 import click
 import sys
-from .utils import parse_date, logger
+from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
 
 @click.group()
 def main():
     """gharc: Stream-filter GitHub Archive data."""
-    pass
+    setup_logging()
 
 @main.command()
 @click.option('--start', required=True, help='Start date (YYYY-MM-DD-HH)')
