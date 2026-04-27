@@ -15,6 +15,14 @@ version: 0.1.0
 date-released: 2026-04-26
 license: MIT
 repository-code: https://github.com/aravpanwar/gharc
+doi: 10.5281/zenodo.19814232
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.19814232
+    description: Concept DOI for all versions
+  - type: doi
+    value: 10.5281/zenodo.19814233
+    description: DOI for v0.1.0
 keywords:
   - github
   - mining-software-repositories

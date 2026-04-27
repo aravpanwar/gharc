@@ -75,6 +75,10 @@ Cloud-warehouse mirrors of GHArchive on Google BigQuery and Snowflake [@githubar
 
 `gharc` occupies the local-first, laptop-friendly niche: no shared infrastructure, no billing account, no schema-bound DSL, just the original GHArchive files streamed and filtered on demand.
 
+# Software availability
+
+The source code is hosted at `github.com/aravpanwar/gharc` and the v0.1.0 release is archived on Zenodo (DOI: [10.5281/zenodo.19814233](https://doi.org/10.5281/zenodo.19814233)). The concept DOI [10.5281/zenodo.19814232](https://doi.org/10.5281/zenodo.19814232) always resolves to the latest archived version.
+
 # Acknowledgements
 
 The author thanks Ilya Grigorik and the GHArchive maintainers for the public dataset on which this tool depends, and the maintainers of the `requests` [@reitz2011requests], `pandas` [@mckinney2010data], `pyarrow` [@apachearrow], `tqdm`, and `orjson` libraries that `gharc` builds on.
