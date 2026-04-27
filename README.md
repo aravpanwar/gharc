@@ -130,6 +130,14 @@ gharc download \
 
 ---
 
+## Resumable runs
+
+For long jobs, `gharc` keeps a small `<output>.state.json` next to the output file listing which hours it has already processed. If the run crashes, restarting the same command picks up where it left off rather than redoing completed hours. The state file is removed automatically when the run finishes cleanly.
+
+Resume support requires JSONL output. Parquet writers cannot append to a closed file, so for multi-hour runs use `--output run.jsonl` and convert to Parquet at the end.
+
+---
+
 ##  Automating Bulk Downloads
 
 For long date ranges, the included [`examples/orchestrator.py`](examples/orchestrator.py) script runs `gharc` month by month so each year produces one Parquet file per month rather than one giant output:

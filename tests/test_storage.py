@@ -1,5 +1,6 @@
 import json
 import pyarrow.parquet as pq
+import pytest
 from gharc.storage import DataWriter
 
 
@@ -83,3 +84,31 @@ def test_parquet_handles_heterogeneous_event_types(tmp_path):
 
     table = pq.read_table(str(out))
     assert table.num_rows == 2
+
+
+def test_jsonl_append_preserves_existing(tmp_path):
+    out = tmp_path / "events.jsonl"
+
+    writer = DataWriter(str(out))
+    writer.write(SAMPLE_EVENTS[0])
+    writer.close()
+
+    writer = DataWriter(str(out), append=True)
+    writer.write(SAMPLE_EVENTS[1])
+    writer.close()
+
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["id"] == "1"
+    assert json.loads(lines[1])["id"] == "2"
+
+
+def test_parquet_append_into_existing_raises(tmp_path):
+    out = tmp_path / "events.parquet"
+
+    writer = DataWriter(str(out))
+    writer.write(SAMPLE_EVENTS[0])
+    writer.close()
+
+    with pytest.raises(ValueError, match="JSONL"):
+        DataWriter(str(out), append=True)

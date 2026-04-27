@@ -141,26 +141,89 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+class _RunState:
+    """Tracks which hours have been completed so a crashed run can resume.
+
+    State lives next to the output file as <output>.state.json. The fingerprint
+    of the run (window + filters) is stored alongside the done-hour list, so
+    re-running with different filters against the same output triggers a clear
+    error rather than silently mixing data.
+    """
+
+    def __init__(self, output_path, fingerprint):
+        self._path = str(output_path) + ".state.json"
+        self._fingerprint = fingerprint
+        self._done = set()
+        if os.path.exists(self._path):
+            try:
+                with open(self._path, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                logger.warning(f"State file {self._path} unreadable, starting fresh")
+                return
+            if payload.get("fingerprint") != fingerprint:
+                raise ValueError(
+                    f"State file {self._path} was written for a different run "
+                    f"(window or filters changed). Remove it or use a new --output."
+                )
+            self._done = set(payload.get("done_hours", []))
+
+    def is_done(self, ts):
+        return ts.isoformat() in self._done
+
+    def mark_done(self, ts):
+        self._done.add(ts.isoformat())
+        with open(self._path, "w", encoding="utf-8") as f:
+            json.dump(
+                {"fingerprint": self._fingerprint, "done_hours": sorted(self._done)},
+                f,
+            )
+
+    def clear(self):
+        if os.path.exists(self._path):
+            os.remove(self._path)
+
+
+def _run_fingerprint(start, end, repos, event_types):
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "repos": sorted(repos) if repos else None,
+        "event_types": sorted(event_types) if event_types else None,
+    }
+
+
 def process_range(start, end, repos, event_types, output, workers):
-    writer = DataWriter(output)
-    timestamps = list(date_range(start, end))
+    fingerprint = _run_fingerprint(start, end, repos, event_types)
+    state = _RunState(output, fingerprint)
+
+    resuming = bool(state._done)
+    writer = DataWriter(output, append=resuming)
+    all_timestamps = list(date_range(start, end))
+    todo = [t for t in all_timestamps if not state.is_done(t)]
+    skipped = len(all_timestamps) - len(todo)
+    if skipped:
+        logger.info(f"Resuming: skipping {skipped} hours already in state file")
+
+    if not todo:
+        writer.close()
+        logger.info(f"Nothing to do; output already complete at {output}")
+        return
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_time = {
-            executor.submit(process_single_hour, ts, repos, event_types): ts 
-            for ts in timestamps
+            executor.submit(process_single_hour, ts, repos, event_types): ts
+            for ts in todo
         }
-        
-        # FIX: smoothing=0 makes ETA stable (average speed)
-        # unit_scale=False ensures it just counts files (hours)
+
         with tqdm(
-            total=len(timestamps), 
-            desc="Processing", 
-            unit="hr", 
-            smoothing=0, 
-            dynamic_ncols=True
+            total=len(todo),
+            desc="Processing",
+            unit="hr",
+            smoothing=0,
+            dynamic_ncols=True,
         ) as pbar:
-            
+
             for future in concurrent.futures.as_completed(future_to_time):
                 ts = future_to_time[future]
                 try:
@@ -168,10 +231,16 @@ def process_range(start, end, repos, event_types, output, workers):
                     if data:
                         for record in data:
                             writer.write(record)
+                    # Flush so this hour is durable on disk before we mark it
+                    # done. If the process crashes after mark_done, restart
+                    # skips this hour and the data is already written.
+                    writer.flush()
+                    state.mark_done(ts)
                 except Exception as exc:
                     tqdm.write(f"Worker exception for {ts}: {exc}")
                 finally:
                     pbar.update(1)
-                
+
     writer.close()
+    state.clear()
     logger.info(f"Done! Data written to {output}")

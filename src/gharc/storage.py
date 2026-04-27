@@ -8,14 +8,22 @@ from .utils import logger
 
 
 class DataWriter:
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, append: bool = False):
         self.filename = filename
         self.is_parquet = filename.endswith('.parquet')
         self.buffer = []
         self.buffer_size = 10000
         self._pq_writer = None
 
-        if os.path.exists(self.filename):
+        if append and self.is_parquet and os.path.exists(self.filename):
+            # ParquetWriter cannot append to a closed Parquet file. For long
+            # crash-safe runs use JSONL; convert to Parquet at the end.
+            raise ValueError(
+                f"Cannot resume into existing Parquet file {filename}. "
+                f"Use JSONL output for resumable runs and convert at the end."
+            )
+
+        if not append and os.path.exists(self.filename):
             os.remove(self.filename)
 
     def write(self, record: dict):
