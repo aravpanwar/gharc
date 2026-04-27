@@ -1,8 +1,8 @@
 # Benchmark results
 
-All runs done on 2026-04-26 from a residential connection in Hyderabad,
-India. Paper claims should cite these numbers and re-running the scripts in
-this directory should reproduce them within reasonable variance.
+All runs done on 2026-04-26 from a typical residential connection. Paper
+claims should cite these numbers and re-running the scripts in this
+directory should reproduce them within reasonable variance.
 
 ## Host
 

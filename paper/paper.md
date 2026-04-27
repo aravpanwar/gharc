@@ -11,7 +11,7 @@ authors:
     orcid: 0009-0009-3013-5970
     affiliation: 1
 affiliations:
- - name: Independent Researcher, Hyderabad, India
+ - name: Independent Researcher
    index: 1
 date: 26 April 2026
 bibliography: paper.bib
@@ -45,7 +45,7 @@ The main thread receives matching events from completed futures and writes them 
 
 # Performance
 
-We measured `gharc` on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a residential connection in Hyderabad, India.
+We measured `gharc` on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a typical residential connection.
 
 A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apache/spark`, completed in 76 seconds with a single worker and 58 seconds with four workers. Both runs recovered the same 14 events, so concurrency does not affect output correctness. Peak resident set size stayed under 110 MB in both configurations. The limiting factor on residential links is HTTPS download throughput rather than CPU; additional workers beyond a small number add little once the connection saturates.
 

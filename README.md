@@ -45,7 +45,7 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 
 ## Performance
 
-Measured on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a residential connection in Hyderabad, India. Reproducible scripts in [`benchmarks/`](benchmarks/).
+Measured on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a typical residential connection. Reproducible scripts in [`benchmarks/`](benchmarks/).
 
 A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apache/spark`:
 
