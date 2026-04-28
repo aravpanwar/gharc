@@ -11,8 +11,8 @@ authors:
   - family-names: Panwar
     given-names: Arav
     orcid: https://orcid.org/0009-0009-3013-5970
-version: 0.1.0
-date-released: 2026-04-26
+version: 0.1.1
+date-released: 2026-04-28
 license: MIT
 repository-code: https://github.com/aravpanwar/gharc
 doi: 10.5281/zenodo.19814232
