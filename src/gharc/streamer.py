@@ -171,6 +171,9 @@ class _RunState:
                 )
             self._done = set(payload.get("done_hours", []))
 
+    def __len__(self):
+        return len(self._done)
+
     def is_done(self, ts):
         return ts.isoformat() in self._done
 
@@ -197,10 +200,37 @@ def _run_fingerprint(start, end, repos, event_types):
 
 
 def process_range(start, end, repos, event_types, output, workers):
+    """Stream-and-filter GHArchive over [start, end) and write matching events.
+
+    Hours in the range are dispatched to a thread pool. Each worker downloads
+    the corresponding GHArchive file, applies the repo and event-type filters,
+    and returns matching events. The main thread writes them through a
+    DataWriter (Parquet via streaming append, or JSONL).
+
+    Crash safety: a `<output>.state.json` file records which hours have
+    finished. Restarting the same command picks up where it left off. The
+    state file is removed on clean completion. Resume into an existing
+    Parquet output is rejected because Parquet writers cannot append to a
+    closed file; use JSONL for runs that may need to be resumed and convert
+    afterwards with ``gharc convert``.
+
+    Args:
+        start: Inclusive start datetime (rounded to the hour).
+        end: Exclusive end datetime (rounded to the hour).
+        repos: Optional list of ``owner/name`` repository filters; ``None``
+            keeps all repos.
+        event_types: Optional list of GHArchive event-type filters
+            (e.g. ``["PushEvent", "PullRequestEvent"]``); ``None`` keeps all
+            event types.
+        output: Path to the output file. Suffix ``.parquet`` or ``.jsonl``
+            selects the writer.
+        workers: Size of the thread pool. Network-bound on residential
+            connections; values above 4 give diminishing returns.
+    """
     fingerprint = _run_fingerprint(start, end, repos, event_types)
     state = _RunState(output, fingerprint)
 
-    resuming = bool(state._done)
+    resuming = len(state) > 0
     writer = DataWriter(output, append=resuming)
     all_timestamps = list(date_range(start, end))
     todo = [t for t in all_timestamps if not state.is_done(t)]

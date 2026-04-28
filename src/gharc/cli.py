@@ -11,8 +11,8 @@ def main():
     setup_logging()
 
 @main.command()
-@click.option('--start', required=True, help='Start date (YYYY-MM-DD-HH)')
-@click.option('--end', required=True, help='End date (YYYY-MM-DD-HH)')
+@click.option('--start', required=True, help='Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
+@click.option('--end', required=True, help='End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
 @click.option('--repos', help='Comma-separated repos (e.g. apache/spark)')
 @click.option('--event-types', help='Comma-separated events (e.g. PushEvent)')
 @click.option('--output', default='filtered.jsonl', help='Output file')

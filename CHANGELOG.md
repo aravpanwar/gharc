@@ -1,0 +1,68 @@
+# Changelog
+
+All notable changes to gharc are recorded here. Format loosely follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
+follows [Semantic Versioning](https://semver.org/).
+
+## [0.1.2] - 2026-04-28
+
+### Changed
+- `_RunState` no longer requires callers to reach into a private attribute
+  to check for resume state. `len(state)` returns the number of completed
+  hours.
+- CLI help strings for `--start` and `--end` now mention both
+  `YYYY-MM-DD` and `YYYY-MM-DD-HH` formats and that `--end` is exclusive,
+  matching the README.
+- The schema-drift comment in `DataWriter.flush` describes
+  `cast(safe=False)` behavior accurately: it allows lossy type coercions
+  on shared columns, does not drop rows, and raises if a later batch
+  introduces a column the first batch's schema lacks.
+
+### Documentation
+- Public API now has docstrings: `process_range`, `DataWriter` (class plus
+  `write`, `flush`, `close`).
+- This file (`CHANGELOG.md`) added.
+
+## [0.1.1] - 2026-04-28
+
+### Added
+- `_RunState`: hour-level checkpoint that lets a crashed run resume by
+  reading `<output>.state.json` next to the output file. The state file
+  records a fingerprint of the run (window plus filters) and is removed
+  on clean completion.
+- `gharc.jsonl_to_parquet` and `gharc convert <jsonl> <parquet>` CLI
+  subcommand for converting a JSONL output to a single Parquet file.
+- Python API example in the README.
+- `setuptools-scm` derives the package version from the git tag, so the
+  installed `gharc.__version__` matches the release.
+- `Release` GitHub Actions workflow that builds and publishes to PyPI on
+  every published GitHub release via OIDC trusted publishing.
+
+### Changed
+- `process_range` flushes the writer after each completed hour, so the
+  data for that hour is durable on disk before the hour is marked done in
+  the state file.
+- `DataWriter` accepts an `append` flag; combined with the resume path,
+  this preserves prior JSONL content on restart.
+- Improved error logging in `streamer.py`: download failures and HTTP
+  status codes are logged at debug level rather than swallowed silently;
+  the user-visible failure message includes the URL.
+
+## [0.1.0] - 2026-04-26
+
+### Added
+- Initial release.
+- `gharc download` CLI that streams hourly GHArchive files, applies
+  repository and event-type filters, and writes Parquet or JSONL.
+- Per-thread `requests` session for connection pooling across hours.
+- Fast byte-level token check before JSON parsing to skip irrelevant
+  lines.
+- ParquetWriter-based streaming append with JSON-stringified nested
+  fields for stable schema across heterogeneous event types.
+- Reproducible benchmarks under `benchmarks/`.
+- JOSS-style paper draft under `paper/`.
+- MIT license, CITATION.cff, Zenodo deposit.
+
+[0.1.2]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.2
+[0.1.1]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.1
+[0.1.0]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.0

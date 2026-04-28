@@ -8,6 +8,20 @@ from .utils import logger
 
 
 class DataWriter:
+    """Buffered writer for filtered GHArchive events.
+
+    Output format is chosen by suffix: ``.parquet`` opens a long-lived
+    ``pyarrow.parquet.ParquetWriter`` and writes compressed row groups;
+    anything else writes JSON lines. Records are buffered in memory and
+    flushed in batches of ``buffer_size`` (default 10,000) or when ``flush()``
+    is called explicitly.
+
+    By default, constructing a DataWriter against an existing file truncates
+    it. Pass ``append=True`` (used by resumable runs) to keep the existing
+    JSONL contents and append to them. Append into an existing Parquet file
+    is rejected because ParquetWriter cannot append to a closed file.
+    """
+
     def __init__(self, filename: str, append: bool = False):
         self.filename = filename
         self.is_parquet = filename.endswith('.parquet')
@@ -16,8 +30,6 @@ class DataWriter:
         self._pq_writer = None
 
         if append and self.is_parquet and os.path.exists(self.filename):
-            # ParquetWriter cannot append to a closed Parquet file. For long
-            # crash-safe runs use JSONL; convert to Parquet at the end.
             raise ValueError(
                 f"Cannot resume into existing Parquet file {filename}. "
                 f"Use JSONL output for resumable runs and convert at the end."
@@ -27,11 +39,13 @@ class DataWriter:
             os.remove(self.filename)
 
     def write(self, record: dict):
+        """Buffer one event for later flush."""
         self.buffer.append(record)
         if len(self.buffer) >= self.buffer_size:
             self.flush()
 
     def flush(self):
+        """Write any buffered events to disk and clear the buffer."""
         if not self.buffer:
             return
 
@@ -41,13 +55,22 @@ class DataWriter:
             table = pa.Table.from_pandas(df, preserve_index=False)
 
             if self._pq_writer is None:
+                # Schema from the first non-empty batch is authoritative for
+                # the whole file. Subsequent batches are cast to it below.
                 self._pq_writer = pq.ParquetWriter(
                     self.filename,
                     schema=table.schema,
                     compression='snappy',
                 )
             else:
-                # Cast to the schema we opened with; event payloads vary in shape.
+                # Coerce later batches to the original schema. ``safe=False``
+                # allows lossy type conversions (e.g. int widening) on shared
+                # columns; it does not drop rows. If a later batch carries a
+                # column the original schema lacks, pyarrow raises rather
+                # than discarding it. In practice gharc avoids this by
+                # JSON-stringifying nested fields before write, which keeps
+                # the schema flat and stable across heterogeneous event
+                # types.
                 table = table.cast(self._pq_writer.schema, safe=False)
 
             self._pq_writer.write_table(table)
@@ -59,6 +82,7 @@ class DataWriter:
         self.buffer = []
 
     def close(self):
+        """Flush remaining events and close the underlying writer."""
         self.flush()
         if self._pq_writer is not None:
             self._pq_writer.close()
