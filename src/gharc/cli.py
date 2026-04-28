@@ -3,6 +3,7 @@ import click
 import sys
 from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
+from .storage import jsonl_to_parquet
 
 @click.group()
 def main():
@@ -25,6 +26,19 @@ def download(start, end, repos, event_types, output, workers):
         
         process_range(s_dt, e_dt, repo_list, type_list, output, workers)
         
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
+
+
+@main.command()
+@click.argument('input_path', type=click.Path(exists=True, dir_okay=False))
+@click.argument('output_path', type=click.Path(dir_okay=False))
+@click.option('--batch-size', default=10000, help='Rows per Parquet row group')
+def convert(input_path, output_path, batch_size):
+    """Convert a JSONL output from `gharc download` into a single Parquet file."""
+    try:
+        jsonl_to_parquet(input_path, output_path, batch_size=batch_size)
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)

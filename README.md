@@ -134,7 +134,36 @@ gharc download \
 
 For long jobs, `gharc` keeps a small `<output>.state.json` next to the output file listing which hours it has already processed. If the run crashes, restarting the same command picks up where it left off rather than redoing completed hours. The state file is removed automatically when the run finishes cleanly.
 
-Resume support requires JSONL output. Parquet writers cannot append to a closed file, so for multi-hour runs use `--output run.jsonl` and convert to Parquet at the end.
+Resume support requires JSONL output. Parquet writers cannot append to a closed file, so for multi-hour runs use `--output run.jsonl` and convert to Parquet at the end:
+
+```bash
+gharc convert run.jsonl run.parquet
+```
+
+---
+
+## Python API
+
+The CLI is a thin wrapper around `gharc.process_range`, which you can call directly:
+
+```python
+from datetime import datetime
+import gharc
+
+gharc.setup_logging()
+gharc.process_range(
+    start=datetime(2024, 1, 1),
+    end=datetime(2024, 1, 2),
+    repos=["apache/spark"],
+    event_types=None,
+    output="spark_one_day.jsonl",
+    workers=4,
+)
+
+gharc.jsonl_to_parquet("spark_one_day.jsonl", "spark_one_day.parquet")
+```
+
+`__all__` in `gharc/__init__.py` lists the public surface (`process_range`, `jsonl_to_parquet`, `DataWriter`, `parse_date`, `date_range`, `get_url_for_time`, `setup_logging`, plus the filter helpers).
 
 ---
 

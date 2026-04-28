@@ -112,3 +112,58 @@ def test_parquet_append_into_existing_raises(tmp_path):
 
     with pytest.raises(ValueError, match="JSONL"):
         DataWriter(str(out), append=True)
+
+
+def test_jsonl_to_parquet_round_trip(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    jsonl_path = tmp_path / "events.jsonl"
+    parquet_path = tmp_path / "events.parquet"
+
+    writer = DataWriter(str(jsonl_path))
+    for event in SAMPLE_EVENTS:
+        writer.write(event)
+    writer.close()
+
+    rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+    assert rows == 2
+
+    table = pq.read_table(str(parquet_path))
+    df = table.to_pandas()
+    assert len(df) == 2
+    assert set(df["id"].astype(str)) == {"1", "2"}
+    payload = json.loads(df.iloc[0]["payload"])
+    assert payload["ref"] == "refs/heads/master"
+
+
+def test_jsonl_to_parquet_skips_blank_and_malformed_lines(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    jsonl_path = tmp_path / "messy.jsonl"
+    parquet_path = tmp_path / "events.parquet"
+
+    jsonl_path.write_text(
+        json.dumps(SAMPLE_EVENTS[0]) + "\n"
+        + "\n"
+        + "{ this is not valid json\n"
+        + json.dumps(SAMPLE_EVENTS[1]) + "\n",
+        encoding="utf-8",
+    )
+
+    rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+    assert rows == 2
+
+
+def test_jsonl_to_parquet_streams_large_input(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    jsonl_path = tmp_path / "many.jsonl"
+    parquet_path = tmp_path / "many.parquet"
+
+    with jsonl_path.open("w", encoding="utf-8") as f:
+        for i in range(2500):
+            f.write(json.dumps({**SAMPLE_EVENTS[0], "id": str(i)}) + "\n")
+
+    rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path), batch_size=500)
+    assert rows == 2500
+    assert pq.read_table(str(parquet_path)).num_rows == 2500

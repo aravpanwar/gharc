@@ -75,3 +75,62 @@ def _flatten_event(event: dict) -> dict:
         else:
             out[key] = value
     return out
+
+
+def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000) -> int:
+    """Stream a JSONL file into a single Parquet file.
+
+    Reads `input_path` line by line, batches into Parquet row groups of up to
+    `batch_size` rows, and writes to `output_path`. Returns the number of rows
+    written. Designed to handle multi-GB inputs without loading the whole file
+    into memory.
+    """
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
+    writer = None
+    buffer = []
+    rows_written = 0
+
+    def flush():
+        nonlocal writer
+        if not buffer:
+            return
+        rows = [_flatten_event(e) for e in buffer]
+        df = pd.DataFrame(rows)
+        table = pa.Table.from_pandas(df, preserve_index=False)
+        if writer is None:
+            writer = pq.ParquetWriter(
+                output_path,
+                schema=table.schema,
+                compression='snappy',
+            )
+        else:
+            table = table.cast(writer.schema, safe=False)
+        writer.write_table(table)
+
+    try:
+        with open(input_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    buffer.append(json.loads(line))
+                except json.JSONDecodeError:
+                    logger.warning(f"Skipping malformed JSON line in {input_path}")
+                    continue
+                if len(buffer) >= batch_size:
+                    flush()
+                    rows_written += len(buffer)
+                    buffer.clear()
+
+        if buffer:
+            flush()
+            rows_written += len(buffer)
+    finally:
+        if writer is not None:
+            writer.close()
+
+    logger.info(f"Converted {rows_written:,} rows from {input_path} to {output_path}")
+    return rows_written

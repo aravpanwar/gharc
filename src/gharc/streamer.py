@@ -64,19 +64,21 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> b
     try:
         with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
             if r.status_code == 416: # Range not satisfiable (file done)
-                return True 
+                return True
             if r.status_code not in [200, 206]:
+                logger.debug(f"HTTP {r.status_code} for {url}")
                 return False
 
             if r.status_code == 200 and mode == 'ab':
                 mode = 'wb'
-                
+
             with open(temp_path, mode) as f:
                 for chunk in r.iter_content(chunk_size=65536):
-                    if chunk: 
+                    if chunk:
                         f.write(chunk)
         return True
     except Exception as e:
+        logger.debug(f"Download attempt failed for {url}: {e}")
         return False
 
 def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
@@ -106,7 +108,7 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
             time.sleep(2)
             
         if not download_success:
-            tqdm.write(f"Failed to download {dt}")
+            tqdm.write(f"Failed to download {url} after 10 attempts (run with debug logging for details)")
             return []
 
         try:
@@ -127,13 +129,14 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
                             if fast_tokens and not fast_string_check(decoded, fast_tokens):
                                 continue
                             event = json.loads(decoded)
-                            
+
                         if passes_filters(event, repos, event_types):
                             results.append(event)
-                    except (ValueError, Exception):
+                    except Exception:
+                        # GHArchive occasionally has malformed lines; expected at low rates.
                         continue
         except Exception as e:
-             tqdm.write(f"Error reading gzip for {dt}: {e}")
+             tqdm.write(f"Error reading gzip for {url}: {e}")
 
         return results
 
