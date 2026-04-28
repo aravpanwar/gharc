@@ -1,5 +1,6 @@
 # gharc: GitHub Archive Stream-Processor
 
+[![PyPI](https://img.shields.io/pypi/v/gharc.svg)](https://pypi.org/project/gharc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/aravpanwar/gharc/actions/workflows/test.yml/badge.svg)](https://github.com/aravpanwar/gharc/actions)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -66,7 +67,14 @@ The same six-hour window comprises about 1.2 GB of compressed source on the GHAr
 - Python 3.8 or higher
 - `pip`
 
+### Install from PyPI
+
+```bash
+pip install gharc
+```
+
 ### Install from Source
+
 ```bash
 git clone https://github.com/aravpanwar/gharc.git
 cd gharc
@@ -80,7 +88,7 @@ pip install -e .
 For maximum speed, install with the `fast` extra. `gharc` detects and uses `orjson` automatically when available.
 
 ```bash
-pip install -e ".[fast]"
+pip install "gharc[fast]"
 ```
 
 ---

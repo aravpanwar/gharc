@@ -1,4 +1,9 @@
-__version__ = "0.1.0"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("gharc")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
 
 from .filters import passes_filters, fast_string_check
 from .storage import DataWriter, jsonl_to_parquet
