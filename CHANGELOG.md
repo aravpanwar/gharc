@@ -7,6 +7,8 @@ follows [Semantic Versioning](https://semver.org/).
 ## [0.1.2] - 2026-04-28
 
 ### Changed
+- Minimum supported Python is now 3.10. The 3.8 and 3.9 series are both
+  upstream EOL. CI runs on 3.10, 3.11, and 3.12.
 - `_RunState` no longer requires callers to reach into a private attribute
   to check for resume state. `len(state)` returns the number of completed
   hours.
@@ -17,6 +19,23 @@ follows [Semantic Versioning](https://semver.org/).
   `cast(safe=False)` behavior accurately: it allows lossy type coercions
   on shared columns, does not drop rows, and raises if a later batch
   introduces a column the first batch's schema lacks.
+- Cloud-warehouse framing in the paper and README no longer makes
+  unprovable cost claims; the relevant friction is the cloud billing
+  account requirement.
+- Paper's case study trimmed to a motivating-use-case paragraph; the
+  quantitative findings of the prior Spark study live in that study,
+  not here.
+- Paper's Performance section notes that throughput numbers depend on
+  filter selectivity (tight filter rejects most lines before JSON parse;
+  wider filters shift the bottleneck toward parsing).
+
+### Added
+- Limitations paragraph in the paper covering network bound, scope
+  (filter not query), pre-2015 schema break, and JSONL-only resume.
+- Windows PowerShell venv activation in the README's source install
+  section.
+- A pointer under the basic usage example noting that long runs should
+  use JSONL for crash-safe resume.
 
 ### Documentation
 - Public API now has docstrings: `process_range`, `DataWriter` (class plus

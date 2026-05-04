@@ -7,7 +7,7 @@ name = "gharc"
 dynamic = ["version"]
 description = "A stream-processing tool for GitHub Archive data filtering."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
   { name = "Arav Panwar", email = "aravpanwar@outlook.com" },
 ]

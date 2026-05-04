@@ -28,7 +28,7 @@ The GitHub Archive [@gharchive] is one of the most widely used data sources in m
 This scale poses a practical barrier to anyone without institutional infrastructure. Three traditional approaches each exclude part of the research community:
 
 1. **Bulk local downloads.** Storing even a single year of GHArchive uncompressed exceeds the disk budget of most laptops. Filtering after the fact still requires the full download to be present.
-2. **Cloud warehouses.** GHArchive is mirrored on Google BigQuery and Snowflake [@githubarchivebigquery]. Both are excellent for query workloads, but they require a billing account, and exploratory analyses can quickly exceed free quotas.
+2. **Cloud warehouses.** GHArchive is mirrored on Google BigQuery and Snowflake [@githubarchivebigquery]. Both are excellent for query workloads, but they require a cloud billing account.
 3. **Hosted research infrastructures.** Tools such as GHTorrent [@gousios2013ghtorrent], Boa [@dyer2013boa], and World of Code [@ma2019worldofcode] have provided shared access to GitHub-derived data, but each carries its own constraints. GHTorrent's project domain has been allowed to expire as of 2026, Boa's hosted endpoint is currently unreachable, and World of Code requires registration and remote access to dedicated servers.
 
 `gharc` fills the laptop-friendly local-first niche. By streaming each hour's compressed archive through a small in-memory buffer and discarding it immediately after filtering, the tool keeps peak storage bounded while preserving the ability to operate on multi-year time ranges with no warehousing dependency. This is the configuration most useful to independent researchers, students, and small teams.
@@ -51,13 +51,11 @@ A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apa
 
 The same six-hour window comprises approximately 1.2 GB of compressed source data on the GHArchive side; the filtered Parquet output for `apache/spark` is 53 KB. That ratio of roughly 22,000 to 1 quantifies the storage saving from streaming-and-filtering. At no point did peak local disk exceed the size of a single in-flight temporary file (about 150 MB).
 
-Extrapolating from these numbers, a full January to June 2024 fetch (4,380 hours of source data at about 90 MB per hour) is approximately 395 GB streamed, which is achievable in three to four evening sessions on the same hardware. The reproducible benchmark scripts are included in the repository under `benchmarks/`.
+Extrapolating from these numbers, a full January to June 2024 fetch (4,380 hours of source data at about 90 MB per hour) is approximately 395 GB streamed, which is achievable in three to four evening sessions on the same hardware. These figures assume a tight filter (one repository) where the byte-level token check rejects the majority of lines before JSON parsing; wider or empty filters would shift the bottleneck toward parsing cost and produce different absolute throughput. The reproducible benchmark scripts are included in the repository under `benchmarks/`.
 
-# Case study: Apache Spark, January to June 2024
+# Motivating use case
 
-The motivation for `gharc` came from a six-month analysis of Apache Spark contributor activity originally conducted as an undergraduate course mini-project [@panwar2025sparkcodebase]. That earlier study downloaded GHArchive month by month, ran a separate filter script over each month, and ultimately recovered 40,237 events from 2,384 unique contributors across the six months. Of those, nine "core" contributors accounted for 53 percent of total activity, and 57 percent of all events were code review (`PullRequestReviewEvent` and `PullRequestReviewCommentEvent`), consistent with prior characterizations of large Apache projects as review-heavy.
-
-That month-by-month pipeline was prone to off-by-one errors in date ranges (notably a "seventh-month bleed" caused by an inclusive end bound), and it required around 100 GB of intermediate local disk during processing. `gharc` reproduces the same analysis on the same laptop with no intermediate disk pressure and a single command. A full re-fetch using `gharc` is currently in progress and will be reported in future work, alongside a comparative case study across six high-volume projects (`microsoft/vscode`, `golang/go`, `facebook/react`, `kubernetes/kubernetes`, `apache/spark`, `rust-lang/rust`) for the period 2019 to 2024.
+The motivation for `gharc` came from a six-month analysis of Apache Spark contributor activity originally conducted as an undergraduate course mini-project [@panwar2025sparkcodebase]. That earlier pipeline downloaded GHArchive month by month, ran a separate filter script over each month, and combined an off-by-one error in the date range (a "seventh-month bleed" caused by an inclusive end bound) with intermediate local disk pressure of approximately 100 GB during processing. `gharc` reproduces the same kind of analysis on the same laptop with no intermediate disk pressure and a single command, and treats the end bound as exclusive so the bleed cannot recur.
 
 # Related work
 
@@ -71,9 +69,18 @@ World of Code [@ma2019worldofcode] provides shared access to a curated cross-ref
 
 Boa [@dyer2013boa] offers a domain-specific language for ultra-large-scale repository queries against curated datasets, again served from a hosted endpoint. At the time of writing the public endpoint at `boa.cs.iastate.edu` is unreachable.
 
-Cloud-warehouse mirrors of GHArchive on Google BigQuery and Snowflake [@githubarchivebigquery] are highly performant but require a billing account and quota management.
+Cloud-warehouse mirrors of GHArchive on Google BigQuery and Snowflake [@githubarchivebigquery] are highly performant but require a cloud billing account.
 
 `gharc` occupies the local-first, laptop-friendly niche: no shared infrastructure, no billing account, no schema-bound DSL, just the original GHArchive files streamed and filtered on demand.
+
+# Limitations
+
+`gharc` has scope boundaries researchers should plan around:
+
+- It is bounded by HTTPS download throughput on the GHArchive side, not by local CPU. On residential connections, additional workers beyond a small number give diminishing returns.
+- It is a streaming filter, not a query system. Aggregations, joins, and ad-hoc cross-time queries are deliberately out of scope; users pair `gharc` with whichever analysis tool they prefer (pandas, Polars, DuckDB, Spark).
+- GHArchive uses the GitHub Events API schema from January 2015 onward and an older Timeline API schema before that. `gharc` does not normalise across that boundary; studies covering 2011 to 2014 should expect some fields to be missing or differently shaped.
+- Crash-safe resume requires JSONL output. ParquetWriter cannot append to a closed file, so multi-hour runs that may need to recover should write JSONL and convert with `gharc convert` after the run.
 
 # Software availability
 

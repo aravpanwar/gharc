@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/gharc.svg)](https://pypi.org/project/gharc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/aravpanwar/gharc/actions/workflows/test.yml/badge.svg)](https://github.com/aravpanwar/gharc/actions)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![DOI](https://zenodo.org/badge/1112791047.svg)](https://doi.org/10.5281/zenodo.19814232)
 
@@ -15,7 +15,7 @@
 
 ## Why gharc?
 
-The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis requires either massive local storage or expensive cloud warehousing (BigQuery).
+The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis requires either massive local storage or a cloud-warehouse account (BigQuery, Snowflake).
 
 `gharc` solves this by implementing a **Stream-and-Filter** architecture:
 1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
@@ -64,7 +64,7 @@ The same six-hour window comprises about 1.2 GB of compressed source on the GHAr
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.10 or higher
 - `pip`
 
 ### Install from PyPI
@@ -78,8 +78,11 @@ pip install gharc
 ```bash
 git clone https://github.com/aravpanwar/gharc.git
 cd gharc
-python3 -m venv venv
+python -m venv venv
+# macOS / Linux:
 source venv/bin/activate
+# Windows PowerShell:
+#   .\venv\Scripts\Activate.ps1
 pip install -e .
 ```
 
@@ -108,6 +111,8 @@ gharc download \
     --output spark_data.parquet
 
 ```
+
+For multi-hour or multi-day runs, prefer `--output run.jsonl` so the run can resume from where it left off if it crashes; convert to Parquet at the end with `gharc convert run.jsonl run.parquet`. See [Resumable runs](#resumable-runs) below for details.
 
 ### Advanced Filtering
 
