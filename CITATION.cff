@@ -26,6 +26,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.19841314
     description: DOI for v0.1.1
+  - type: doi
+    value: 10.5281/zenodo.20027748
+    description: DOI for v0.1.2
 keywords:
   - github
   - mining-software-repositories
