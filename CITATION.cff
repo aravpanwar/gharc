@@ -5,8 +5,9 @@ title: "gharc: A stream-and-filter tool for the GitHub Archive on consumer hardw
 abstract: >-
   gharc filters the GitHub Archive on consumer hardware by streaming
   each hourly archive through memory and writing only matching events
-  to Parquet or JSONL. Peak local storage stays bounded by a single
-  in-flight download regardless of the time range processed.
+  to Parquet or JSONL. Peak local storage stays bounded by the downloads
+  in flight at once, one temporary file per worker, rather than by the
+  time range processed.
 authors:
   - family-names: Panwar
     given-names: Arav

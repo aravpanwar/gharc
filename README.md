@@ -9,7 +9,7 @@
 
 **Mine the GitHub Archive on a standard laptop.**
 
-`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset on consumer hardware. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by a single in-flight download (about 150 MB) regardless of how long a window you process.
+`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset on consumer hardware. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by the downloads in flight at once, one temporary file per worker (each hourly archive is roughly 60 to 150 MB in 2024), so disk use scales with `--workers` rather than with how long a window you process.
 
 ---
 
@@ -34,11 +34,11 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 
 ## Key Features
 
-* **Zero-Storage Overhead:** Processes terabytes of data with a constant disk footprint of <100MB.
+* **Bounded Storage:** Processes terabytes of source data while keeping only the in-flight downloads on disk, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker). Memory stays near 100 MB.
 * **Resumable Downloads:** Smart handling of network interruptions (common with residential internet) using HTTP Range requests.
 * **High Performance:**
     * Parallel processing with thread pools.
-    * Optimized "Fast String Check" (zero-copy filtering) to skip irrelevant data.
+    * Optimized "Fast String Check" that rejects irrelevant lines with a byte-level token match before any JSON parsing (zero-copy on the `orjson` path).
     * Optional `orjson` support for 3-5x faster parsing.
 * **Parquet Native:** Outputs columnar data ready for Pandas, Spark, or Polars, often reducing file size by 90% compared to JSON.
 
@@ -57,7 +57,7 @@ A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apa
 
 Both runs recovered the same events, so concurrency does not affect output. Peak RSS stays below 110 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection.
 
-The same six-hour window comprises about 1.2 GB of compressed source on the GHArchive side, while the filtered Parquet output is 53 KB. That is a storage saving of roughly 22,000 to 1, and at no point does peak local disk exceed the size of a single in-flight temporary file (about 150 MB).
+The same six-hour window comprises about 416 MB of compressed source on the GHArchive side (six hourly files of roughly 60 to 85 MB each), while the filtered Parquet output is 53 KB. That is a storage saving of roughly 8,000 to 1. Peak local disk is bounded by the temporary files in flight, one per worker: about 85 MB with a single worker and about 250 MB at the default four workers.
 
 ---
 
