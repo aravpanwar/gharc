@@ -47,14 +47,29 @@ The 4-worker run is 1.31x faster than 1-worker. The bottleneck is HTTPS
 download throughput, not CPU; on a residential link the parallelism saturates
 quickly. On hardware with a faster uplink the scaling would be steeper.
 
+## Peak on-disk temp usage (`disk.py`, measured 2026-06-08)
+
+The throughput run above sampled peak RSS but not peak disk. gharc creates one
+temporary `.json.gz` per in-flight hour, so disk scales with the worker count.
+Sampling the temp directory every 50 ms over the same 6-hour window:
+
+| Workers | Peak disk | Concurrent temp files |
+|---|---|---|
+| 1 | 84.6 MB | 1 |
+| 4 | 253.9 MB | 4 |
+
+Peak disk is bounded by `workers` times one hourly file, not by a single
+in-flight download. With the default 4 workers, expect roughly 250 MB.
+
 ## Storage saving from filtering
 
-For the 6-hour window above:
+For the 6-hour window above (the six hourly files measured 71.1, 84.6, 62.1,
+70.9, 65.1, and 62.4 MB compressed):
 
-- Approximate raw GHArchive download (gzipped, all events): ~1.2 GB
+- Raw GHArchive download (gzipped, all events): ~416 MB
 - Filtered output for `apache/spark`: 53 KB
-- Storage ratio: roughly 22,000x
+- Storage ratio: roughly 8,000x
 
-This is the core "stream and filter" claim: gharc never holds the full hour
-on disk after processing it, so peak disk stays bounded by the largest
-in-flight temp file rather than by the total downloaded volume.
+This is the core "stream and filter" claim: gharc never holds a full hour
+on disk after processing it, so peak disk stays bounded by the in-flight temp
+files (one per worker) rather than by the total downloaded volume.

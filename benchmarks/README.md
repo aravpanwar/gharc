@@ -10,11 +10,11 @@ data downloads don't bloat the repo.
 
 - `smoke.py` — pulls one hour of GHArchive filtered to `apache/spark`. Sanity
   check that the pipeline produces well-formed Parquet on real data.
-- `throughput.py` — runs gharc across worker counts (1, 2, 4, 8) on a 24-hour
-  window. Records wall-clock time, peak RAM, peak disk, and output size to
-  JSON.
-- `filter_effectiveness.py` — same 24-hour window with and without a repo
-  filter, showing the storage saving from streaming-and-filtering.
+- `throughput.py` — runs gharc with 1 and 4 workers over a 6-hour window.
+  Records wall-clock time, peak RAM, output size, and event count to JSON.
+- `disk.py` — runs the same 6-hour window with 1 and 4 workers while sampling
+  the temp directory, showing how peak on-disk temp usage scales with the
+  worker count.
 
 ## How to run
 
@@ -22,8 +22,8 @@ data downloads don't bloat the repo.
 pip install -e ".[test]" psutil
 python benchmarks/smoke.py
 python benchmarks/throughput.py
-python benchmarks/filter_effectiveness.py
+python benchmarks/disk.py
 ```
 
-Results land in `benchmarks/results/<script>_<timestamp>.json` and any output
-parquet files in `benchmarks/results/`.
+Results land in `benchmarks/results/` as `<script>_summary.json` plus any
+output files the run produced.
