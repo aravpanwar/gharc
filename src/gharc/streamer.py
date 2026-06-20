@@ -279,12 +279,22 @@ def process_range(start, end, repos, event_types, output, workers):
     writer.close()
 
     if failed:
-        # Leave the state file in place so a rerun retries only the failed
-        # hours, and signal the failure to the caller rather than reporting a
-        # clean finish over partial output.
+        # Signal the failure rather than reporting a clean finish over partial
+        # output. For JSONL we keep the state file so a rerun retries only the
+        # failed hours. Parquet cannot be appended to, so a kept state file
+        # would only make the rerun dead-end on the existing file; clear it so
+        # the rerun starts the window over cleanly.
+        if writer.is_parquet:
+            state.clear()
+            hint = (
+                "Rerun to start the window over, or use JSONL output to retry "
+                "only the failed hours."
+            )
+        else:
+            hint = "Rerun the same command to retry the failed hours."
         raise RuntimeError(
             f"{len(failed)} of {len(todo)} hours failed; output at {output} is "
-            f"incomplete. Rerun the same command to retry the failed hours."
+            f"incomplete. {hint}"
         )
 
     state.clear()

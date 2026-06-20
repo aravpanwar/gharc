@@ -71,3 +71,27 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
     # The completed hour stays in the state file so a rerun retries only the
     # failed hour instead of starting over.
     assert (tmp_path / "out.jsonl.state.json").exists()
+
+
+def test_process_range_parquet_failure_clears_state(tmp_path):
+    out = tmp_path / "out.parquet"
+
+    def fake_hour(dt, repos, event_types):
+        if dt.hour == 1:
+            raise RuntimeError("boom")
+        return []
+
+    with patch('gharc.streamer.process_single_hour', side_effect=fake_hour):
+        with pytest.raises(RuntimeError, match="failed"):
+            process_range(
+                start=datetime(2024, 1, 1, 0),
+                end=datetime(2024, 1, 1, 2),
+                repos=["apache/spark"],
+                event_types=None,
+                output=str(out),
+                workers=1,
+            )
+
+    # Parquet cannot resume, so the state file is cleared rather than left to
+    # dead-end the next run on the existing Parquet file.
+    assert not (tmp_path / "out.parquet.state.json").exists()
