@@ -13,7 +13,7 @@ authors:
 affiliations:
  - name: Independent Researcher
    index: 1
-date: 26 April 2026
+date: 26 July 2026
 bibliography: paper.bib
 ---
 
@@ -55,7 +55,7 @@ Two scope boundaries shape how the tool should be used. It is bound by HTTPS dow
 
 # Research impact statement
 
-`gharc` was motivated by, and reproduces, a six-month study of Apache Spark contributor activity [@panwar2025sparkcodebase] originally run as an undergraduate project. The earlier pipeline downloaded GHArchive month by month, filtered each month with a separate script, peaked near 100 GB of intermediate disk, and contained a date off-by-one error in which an inclusive end bound pulled in an extra month. `gharc` removes both problems: storage stays bounded and the date range is end-exclusive by construction.
+`gharc` was motivated by, and reproduces, a prior six-month study of Apache Spark contributor activity [@panwar2025sparkcodebase]. The earlier pipeline downloaded GHArchive month by month, filtered each month with a separate script, peaked near 100 GB of intermediate disk, and contained a date off-by-one error in which an inclusive end bound pulled in an extra month. `gharc` removes both problems: storage stays bounded and the date range is end-exclusive by construction.
 
 More broadly, the tool lowers the entry cost for event-level GitHub research to a laptop and an internet connection, the configuration available to students and independent researchers without cloud quotas. On a Windows laptop over a residential connection, a six-hour window filtered to `apache/spark` completed in under 80 seconds and recovered the same 14 events at both one and four workers, with peak local disk held to roughly 85 MB and 250 MB respectively; the reproducible benchmark scripts are included in the repository. The package is distributed on PyPI with an automated test suite, and tagged releases are archived on Zenodo, so analyses that depend on it can pin and cite a fixed version.
 
