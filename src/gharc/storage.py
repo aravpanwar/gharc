@@ -7,6 +7,51 @@ import pyarrow.parquet as pq
 from .utils import logger
 
 
+# GHArchive events (GitHub Events API schema, 2015 onward) share a fixed set of
+# top-level fields. The `org` field is only present for org-owned repositories,
+# so it is absent from many events. We pin an explicit Parquet schema covering
+# all of them rather than inferring one from the first batch written. Without
+# this, a run whose first batch lacked `org` would reject every later batch that
+# carried it, dropping those events or leaving a half-written file.
+EVENT_COLUMNS = [
+    "id",
+    "type",
+    "actor",
+    "repo",
+    "payload",
+    "public",
+    "created_at",
+    "org",
+]
+
+EVENT_SCHEMA = pa.schema([
+    pa.field("id", pa.string()),
+    pa.field("type", pa.string()),
+    pa.field("actor", pa.string()),
+    pa.field("repo", pa.string()),
+    pa.field("payload", pa.string()),
+    pa.field("public", pa.bool_()),
+    pa.field("created_at", pa.string()),
+    pa.field("org", pa.string()),
+])
+
+
+def _events_to_table(events: list) -> pa.Table:
+    """Turn a batch of events into a Parquet-ready table with a stable schema.
+
+    Nested fields are JSON-stringified, any of the canonical columns missing
+    from this batch are added as nulls, and the result is coerced to
+    ``EVENT_SCHEMA`` so every batch written to a file looks identical.
+    """
+    rows = [_flatten_event(e) for e in events]
+    df = pd.DataFrame(rows)
+    for col in EVENT_COLUMNS:
+        if col not in df.columns:
+            df[col] = None
+    df = df[EVENT_COLUMNS]
+    return pa.Table.from_pandas(df, schema=EVENT_SCHEMA, preserve_index=False)
+
+
 class DataWriter:
     """Buffered writer for filtered GHArchive events.
 
@@ -50,28 +95,14 @@ class DataWriter:
             return
 
         if self.is_parquet:
-            rows = [_flatten_event(e) for e in self.buffer]
-            df = pd.DataFrame(rows)
-            table = pa.Table.from_pandas(df, preserve_index=False)
+            table = _events_to_table(self.buffer)
 
             if self._pq_writer is None:
-                # Schema from the first non-empty batch is authoritative for
-                # the whole file. Subsequent batches are cast to it below.
                 self._pq_writer = pq.ParquetWriter(
                     self.filename,
-                    schema=table.schema,
+                    schema=EVENT_SCHEMA,
                     compression='snappy',
                 )
-            else:
-                # Coerce later batches to the original schema. ``safe=False``
-                # allows lossy type conversions (e.g. int widening) on shared
-                # columns; it does not drop rows. If a later batch carries a
-                # column the original schema lacks, pyarrow raises rather
-                # than discarding it. In practice gharc avoids this by
-                # JSON-stringifying nested fields before write, which keeps
-                # the schema flat and stable across heterogeneous event
-                # types.
-                table = table.cast(self._pq_writer.schema, safe=False)
 
             self._pq_writer.write_table(table)
         else:
@@ -120,17 +151,13 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
         nonlocal writer
         if not buffer:
             return
-        rows = [_flatten_event(e) for e in buffer]
-        df = pd.DataFrame(rows)
-        table = pa.Table.from_pandas(df, preserve_index=False)
+        table = _events_to_table(buffer)
         if writer is None:
             writer = pq.ParquetWriter(
                 output_path,
-                schema=table.schema,
+                schema=EVENT_SCHEMA,
                 compression='snappy',
             )
-        else:
-            table = table.cast(writer.schema, safe=False)
         writer.write_table(table)
 
     try:
