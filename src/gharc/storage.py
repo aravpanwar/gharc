@@ -197,5 +197,10 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
         if writer is not None:
             writer.close()
 
+    if writer is None:
+        # Input had no usable rows. Still emit a valid empty Parquet file so
+        # the output exists and reads back as a 0-row table.
+        pq.write_table(EVENT_SCHEMA.empty_table(), output_path, compression='snappy')
+
     logger.info(f"Converted {rows_written:,} rows from {input_path} to {output_path}")
     return rows_written

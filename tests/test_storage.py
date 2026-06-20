@@ -232,6 +232,19 @@ def test_jsonl_to_parquet_skips_blank_and_malformed_lines(tmp_path):
     assert rows == 2
 
 
+def test_jsonl_to_parquet_empty_input_writes_empty_file(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    jsonl_path = tmp_path / "empty.jsonl"
+    parquet_path = tmp_path / "empty.parquet"
+    jsonl_path.write_text("", encoding="utf-8")
+
+    rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+    assert rows == 0
+    assert parquet_path.exists()
+    assert pq.read_table(str(parquet_path)).num_rows == 0
+
+
 def test_jsonl_to_parquet_streams_large_input(tmp_path):
     from gharc.storage import jsonl_to_parquet
 
