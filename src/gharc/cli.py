@@ -18,9 +18,19 @@ def main():
 @click.option('--output', default='filtered.jsonl', help='Output file')
 @click.option('--workers', default=4, help='Parallel downloads')
 def download(start, end, repos, event_types, output, workers):
+    """Stream GHArchive over a date range and write matching events.
+
+    Filters by repository and event type, writing Parquet or JSONL chosen by
+    the --output suffix. --end is exclusive.
+    """
     try:
         s_dt = parse_date(start)
         e_dt = parse_date(end)
+        if s_dt >= e_dt:
+            raise ValueError(
+                f"--start ({start}) must be before --end ({end}); "
+                f"--end is exclusive."
+            )
         repo_list = [r.strip() for r in repos.split(',')] if repos else None
         type_list = [t.strip() for t in event_types.split(',')] if event_types else None
         
