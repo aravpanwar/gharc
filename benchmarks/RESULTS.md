@@ -61,15 +61,15 @@ Sampling the temp directory every 50 ms over the same 6-hour window:
 Peak disk is bounded by `workers` times one hourly file, not by a single
 in-flight download. With the default 4 workers, expect roughly 250 MB.
 
-## Storage saving from filtering
+## Storage and disk footprint
 
 For the 6-hour window above (the six hourly files measured 71.1, 84.6, 62.1,
 70.9, 65.1, and 62.4 MB compressed):
 
-- Raw GHArchive download (gzipped, all events): ~416 MB
+- Source streamed from GHArchive (gzipped, all events): ~416 MB
 - Filtered output for `apache/spark`: 53 KB
-- Storage ratio: roughly 8,000x
 
-This is the core "stream and filter" claim: gharc never holds a full hour
-on disk after processing it, so peak disk stays bounded by the in-flight temp
-files (one per worker) rather than by the total downloaded volume.
+The full source is still transferred, so this is not a bandwidth saving. What
+stays bounded is local disk: gharc never holds a full hour on disk after
+processing it, so peak disk tracks the in-flight temp files (one per worker,
+measured in the section above) rather than the total downloaded volume.
