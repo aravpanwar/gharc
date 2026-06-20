@@ -41,28 +41,34 @@ def main():
 
     for start_dt, _end_dt, s_str, e_str in get_month_ranges(start, end):
         month_name = start_dt.strftime("%Y-%m")
-        output_file = os.path.join(args.output_dir, f"gharchive_{month_name}.parquet")
+        parquet_file = os.path.join(args.output_dir, f"gharchive_{month_name}.parquet")
+        # Download to JSONL first so a crashed month resumes from its state
+        # file, then convert to Parquet. A whole-month Parquet download cannot
+        # resume, since Parquet writers cannot append to a closed file.
+        jsonl_file = os.path.join(args.output_dir, f"gharchive_{month_name}.jsonl")
 
-        if os.path.exists(output_file):
+        if os.path.exists(parquet_file):
             print(f"Skipping {month_name} (file exists)")
             continue
 
         print(f"\nProcessing {month_name}...")
 
-        cmd = [
+        download_cmd = [
             "gharc", "download",
             "--start", s_str,
             "--end", e_str,
             "--repos", args.repos,
-            "--output", output_file,
+            "--output", jsonl_file,
             "--workers", str(args.workers),
         ]
 
         try:
-            subprocess.run(cmd, check=True)
+            subprocess.run(download_cmd, check=True)
+            subprocess.run(["gharc", "convert", jsonl_file, parquet_file], check=True)
+            os.remove(jsonl_file)
             print(f"Finished {month_name}")
         except subprocess.CalledProcessError:
-            print(f"Error processing {month_name}, continuing")
+            print(f"Error processing {month_name}, continuing (rerun resumes it)")
 
 
 if __name__ == "__main__":
