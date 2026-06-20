@@ -4,6 +4,28 @@ All notable changes to gharc are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Parquet output no longer drops events or leaves a half-written file when
+  a run mixes events with and without the optional top-level `org` field
+  (events from org-owned versus user-owned repos). The writer and the
+  JSONL converter now pin an explicit schema covering the canonical
+  GHArchive top-level fields instead of inferring one from the first batch.
+  This corrects the 0.1.2 note, which described the old first-batch
+  behaviour as safe; in multi-hour runs it was not.
+- A run that errors on one or more hours now exits non-zero and keeps its
+  state file, so the failure is visible and a rerun retries only the
+  failed hours. Previously such a run still reported a clean finish.
+- A run that matches no events writes a valid empty output (a 0-row
+  Parquet file or an empty JSONL file) rather than no file at all.
+- `download` rejects a `--start` that is not before `--end` instead of
+  silently doing nothing.
+
+### Changed
+- The bundled `examples/orchestrator.py` downloads JSONL per month and
+  converts to Parquet, so a crashed month can resume.
+
 ## [0.1.2] - 2026-04-28
 
 ### Changed
