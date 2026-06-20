@@ -61,7 +61,7 @@ More broadly, the tool lowers the entry cost for event-level GitHub research to 
 
 # AI usage disclosure
 
-*Author to complete before submission. JOSS requires a truthful statement here disclosing any use of generative AI in the software, its documentation, or this paper. If no such tools were used, that must be stated explicitly.*
+The author directed the project throughout: framing the problem, setting the requirements, making the software design decisions, and reviewing, testing, and validating all output. Generative AI assistance (Claude Opus 4.8, Anthropic) was used during implementation, test development, documentation, and the drafting of this paper. Correctness was verified by the author through the automated test suite and live runs against GHArchive that confirmed event counts, output integrity, and the reported benchmarks. The author takes full responsibility for the software and the contents of this paper.
 
 # Software availability
 
