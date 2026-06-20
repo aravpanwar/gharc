@@ -141,6 +141,8 @@ gharc download \
 | `--output` | Output filename (`.parquet` or `.jsonl`) | `data.parquet` |
 | `--workers` | Number of parallel download threads (default: 4) | `8` |
 
+Repository names are matched exactly and are case-sensitive, so pass the canonical `owner/name` as it appears on GitHub (for example `apache/spark`).
+
 ---
 
 ## Resumable runs
