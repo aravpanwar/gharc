@@ -34,13 +34,12 @@ The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis 
 
 ## Key Features
 
-* **Bounded Storage:** Processes terabytes of source data while keeping only the in-flight downloads on disk, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker). Memory stays near 100 MB.
-* **Resumable Downloads:** Smart handling of network interruptions (common with residential internet) using HTTP Range requests.
-* **High Performance:**
-    * Parallel processing with thread pools.
-    * Optimized "Fast String Check" that rejects irrelevant lines with a byte-level token match before any JSON parsing (zero-copy on the `orjson` path).
-    * Optional `orjson` support for 3-5x faster parsing.
-* **Parquet Native:** Outputs columnar data ready for Pandas, Spark, or Polars, often reducing file size by 90% compared to JSON.
+* **Bounded Storage:** Processes terabytes of source data while keeping only the in-flight downloads on disk, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker). For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
+* **Resumable Downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
+* **Parallel processing:** Hours in the range are downloaded and filtered across a thread pool.
+* **Filtering before parsing:** A byte-level token check rejects irrelevant lines before any JSON parsing, so most events are skipped without paying the parser cost.
+* **Optional orjson:** Uses `orjson` for JSON parsing when it is installed, which is faster than the standard library parser.
+* **Parquet output:** Writes columnar data ready for Pandas, Spark, or Polars, typically several times smaller than the equivalent JSONL.
 
 ---
 
@@ -57,7 +56,7 @@ A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apa
 
 Both runs recovered the same events, so concurrency does not affect output. Peak RSS stays below 110 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection.
 
-The same six-hour window comprises about 416 MB of compressed source on the GHArchive side (six hourly files of roughly 60 to 85 MB each), while the filtered Parquet output is 53 KB. That is a storage saving of roughly 8,000 to 1. Peak local disk is bounded by the temporary files in flight, one per worker: about 85 MB with a single worker and about 250 MB at the default four workers.
+Across the same six-hour window gharc streams about 416 MB of compressed source from GHArchive (six hourly files of roughly 60 to 85 MB each) but never retains it. The full source is still transferred, so this is not a bandwidth saving; what stays bounded is local disk. Peak disk is held to the temporary files in flight, one per worker: about 85 MB with a single worker and about 250 MB at the default four workers. The filtered Parquet output for `apache/spark` over that window is 53 KB, and local disk does not grow with the length of the window processed.
 
 ---
 
