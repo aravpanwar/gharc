@@ -59,7 +59,7 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> b
             mode = 'ab'
             # Only log resume if it's significant to keep bar clean
             if current_size > 1024 * 1024: 
-                tqdm.write(f"   ↳ Resuming from {current_size/(1024*1024):.1f} MB")
+                tqdm.write(f"   Resuming from {current_size/(1024*1024):.1f} MB")
 
     try:
         with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
