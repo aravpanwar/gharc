@@ -46,9 +46,19 @@ def _session_for_thread() -> requests.Session:
         _thread_local.session = session
     return session
 
-def download_resumable(url: str, temp_path: str, session: requests.Session) -> bool:
-    """
-    Downloads a file with resume capability.
+# Return values for download_resumable: the file is here, the archive does not
+# exist (a known GHArchive gap, not worth retrying), or a retryable failure.
+DOWNLOAD_OK = "ok"
+DOWNLOAD_MISSING = "missing"
+DOWNLOAD_RETRY = "retry"
+
+
+def download_resumable(url: str, temp_path: str, session: requests.Session) -> str:
+    """Download a file with resume capability.
+
+    Returns ``DOWNLOAD_OK`` once the file is in place, ``DOWNLOAD_MISSING`` if
+    the server says the archive does not exist (HTTP 404 or 410), or
+    ``DOWNLOAD_RETRY`` for a transient failure the caller should retry.
     """
     resume_header = {}
     mode = 'wb'
@@ -58,16 +68,19 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> b
             resume_header = {'Range': f'bytes={current_size}-'}
             mode = 'ab'
             # Only log resume if it's significant to keep bar clean
-            if current_size > 1024 * 1024: 
+            if current_size > 1024 * 1024:
                 tqdm.write(f"   Resuming from {current_size/(1024*1024):.1f} MB")
 
     try:
         with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
             if r.status_code == 416: # Range not satisfiable (file done)
-                return True
+                return DOWNLOAD_OK
+            if r.status_code in (404, 410):
+                logger.debug(f"HTTP {r.status_code} for {url} (archive not present)")
+                return DOWNLOAD_MISSING
             if r.status_code not in [200, 206]:
                 logger.debug(f"HTTP {r.status_code} for {url}")
-                return False
+                return DOWNLOAD_RETRY
 
             if r.status_code == 200 and mode == 'ab':
                 mode = 'wb'
@@ -76,10 +89,10 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> b
                 for chunk in r.iter_content(chunk_size=65536):
                     if chunk:
                         f.write(chunk)
-        return True
+        return DOWNLOAD_OK
     except Exception as e:
         logger.debug(f"Download attempt failed for {url}: {e}")
-        return False
+        return DOWNLOAD_RETRY
 
 def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
     """
@@ -99,17 +112,26 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
     os.close(fd)
     
     download_success = False
-    
+
     try:
         for attempt in range(10):
-            if download_resumable(url, temp_path, session):
+            status = download_resumable(url, temp_path, session)
+            if status == DOWNLOAD_OK:
                 download_success = True
                 break
+            if status == DOWNLOAD_MISSING:
+                logger.warning(f"No archive available at {url}; treating as zero events")
+                return []
             time.sleep(2)
-            
+
         if not download_success:
-            tqdm.write(f"Failed to download {url} after 10 attempts (run with debug logging for details)")
-            return []
+            # A persistent download failure is a real failure, not an empty
+            # hour. Raise so the run reports it and (for JSONL output) retries
+            # this hour on resume, rather than silently dropping it.
+            raise RuntimeError(
+                f"Failed to download {url} after 10 attempts "
+                f"(run with debug logging for details)"
+            )
 
         try:
             with gzip.open(temp_path, 'rb') as f:
