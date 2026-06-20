@@ -113,11 +113,25 @@ class DataWriter:
         self.buffer = []
 
     def close(self):
-        """Flush remaining events and close the underlying writer."""
+        """Flush remaining events and close the underlying writer.
+
+        If nothing matched the filters, still emit a valid empty output so a
+        zero-match run leaves a 0-row file rather than nothing at all, which
+        previously made a clean run look indistinguishable from a broken one.
+        """
         self.flush()
-        if self._pq_writer is not None:
-            self._pq_writer.close()
-            self._pq_writer = None
+        if self.is_parquet:
+            if self._pq_writer is None:
+                pq.write_table(
+                    EVENT_SCHEMA.empty_table(),
+                    self.filename,
+                    compression='snappy',
+                )
+            else:
+                self._pq_writer.close()
+                self._pq_writer = None
+        elif not os.path.exists(self.filename):
+            open(self.filename, 'w', encoding='utf-8').close()
         logger.info(f"Wrote output to {self.filename}")
 
 
