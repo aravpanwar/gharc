@@ -243,6 +243,7 @@ def process_range(start, end, repos, event_types, output, workers):
         logger.info(f"Nothing to do; output already complete at {output}")
         return
 
+    failed = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_time = {
             executor.submit(process_single_hour, ts, repos, event_types): ts
@@ -270,10 +271,21 @@ def process_range(start, end, repos, event_types, output, workers):
                     writer.flush()
                     state.mark_done(ts)
                 except Exception as exc:
+                    failed.append(ts)
                     tqdm.write(f"Worker exception for {ts}: {exc}")
                 finally:
                     pbar.update(1)
 
     writer.close()
+
+    if failed:
+        # Leave the state file in place so a rerun retries only the failed
+        # hours, and signal the failure to the caller rather than reporting a
+        # clean finish over partial output.
+        raise RuntimeError(
+            f"{len(failed)} of {len(todo)} hours failed; output at {output} is "
+            f"incomplete. Rerun the same command to retry the failed hours."
+        )
+
     state.clear()
     logger.info(f"Done! Data written to {output}")

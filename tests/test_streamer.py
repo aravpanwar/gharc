@@ -2,7 +2,7 @@ import pytest
 import os
 import tempfile
 from unittest.mock import MagicMock, patch
-from gharc.streamer import process_single_hour
+from gharc.streamer import process_single_hour, process_range
 from datetime import datetime
 
 # A tiny fake GZIP content for testing
@@ -46,3 +46,28 @@ def test_process_single_hour_success(mock_session_cls):
             # 4. Verify Results
             assert len(results) == 1
             assert results[0]['repo']['name'] == "apache/spark"
+
+
+def test_process_range_raises_when_an_hour_fails(tmp_path):
+    out = tmp_path / "out.jsonl"
+
+    # First hour succeeds with no matches, second hour raises.
+    def fake_hour(dt, repos, event_types):
+        if dt.hour == 1:
+            raise RuntimeError("boom")
+        return []
+
+    with patch('gharc.streamer.process_single_hour', side_effect=fake_hour):
+        with pytest.raises(RuntimeError, match="failed"):
+            process_range(
+                start=datetime(2024, 1, 1, 0),
+                end=datetime(2024, 1, 1, 2),
+                repos=["apache/spark"],
+                event_types=None,
+                output=str(out),
+                workers=1,
+            )
+
+    # The completed hour stays in the state file so a rerun retries only the
+    # failed hour instead of starting over.
+    assert (tmp_path / "out.jsonl.state.json").exists()
