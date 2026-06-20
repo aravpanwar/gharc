@@ -86,6 +86,84 @@ def test_parquet_handles_heterogeneous_event_types(tmp_path):
     assert table.num_rows == 2
 
 
+# org is only present on events from org-owned repos. A batch without it
+# followed by a batch with it (or vice versa) must not drop rows or corrupt
+# the file. buffer_size=1 forces each event into its own batch.
+EVENT_WITHOUT_ORG = {
+    "id": "10",
+    "type": "PushEvent",
+    "actor": {"id": 1, "login": "carol"},
+    "repo": {"id": 9, "name": "carol/dotfiles"},
+    "payload": {"size": 1},
+    "created_at": "2024-01-01T00:00:00Z",
+    "public": True,
+}
+EVENT_WITH_ORG = {
+    "id": "11",
+    "type": "MemberEvent",
+    "actor": {"id": 2, "login": "dave"},
+    "repo": {"id": 1, "name": "apache/spark"},
+    "payload": {"action": "added"},
+    "created_at": "2024-01-01T00:01:00Z",
+    "public": True,
+    "org": {"id": 47, "login": "apache"},
+}
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        [EVENT_WITHOUT_ORG, EVENT_WITH_ORG],
+        [EVENT_WITH_ORG, EVENT_WITHOUT_ORG],
+    ],
+)
+def test_parquet_handles_optional_org_across_batches(tmp_path, order):
+    out = tmp_path / "events.parquet"
+    writer = DataWriter(str(out))
+    writer.buffer_size = 1
+
+    for event in order:
+        writer.write(event)
+    writer.close()
+
+    table = pq.read_table(str(out))
+    assert table.num_rows == 2
+    assert table.column("org").null_count == 1
+
+
+def test_parquet_empty_run_writes_zero_row_file(tmp_path):
+    out = tmp_path / "events.parquet"
+    writer = DataWriter(str(out))
+    writer.close()
+
+    assert out.exists()
+    assert pq.read_table(str(out)).num_rows == 0
+
+
+def test_jsonl_empty_run_writes_empty_file(tmp_path):
+    out = tmp_path / "events.jsonl"
+    writer = DataWriter(str(out))
+    writer.close()
+
+    assert out.exists()
+    assert out.read_text(encoding="utf-8") == ""
+
+
+def test_jsonl_to_parquet_handles_optional_org_across_batches(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    jsonl_path = tmp_path / "events.jsonl"
+    parquet_path = tmp_path / "events.parquet"
+    jsonl_path.write_text(
+        json.dumps(EVENT_WITHOUT_ORG) + "\n" + json.dumps(EVENT_WITH_ORG) + "\n",
+        encoding="utf-8",
+    )
+
+    rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path), batch_size=1)
+    assert rows == 2
+    assert pq.read_table(str(parquet_path)).num_rows == 2
+
+
 def test_jsonl_append_preserves_existing(tmp_path):
     out = tmp_path / "events.jsonl"
 
