@@ -50,6 +50,18 @@ def test_fingerprint_mismatch_raises(tmp_path):
         _RunState(str(out), different_fp)
 
 
+def test_mark_done_writes_atomically_leaving_no_temp(tmp_path):
+    out = tmp_path / "events.jsonl"
+    state = _RunState(str(out), make_fp())
+    state.mark_done(datetime(2024, 1, 1, 0))
+
+    # The state file is valid JSON and no temporary file is left behind.
+    state_file = tmp_path / "events.jsonl.state.json"
+    assert state_file.exists()
+    assert not (tmp_path / "events.jsonl.state.json.tmp").exists()
+    json.loads(state_file.read_text(encoding="utf-8"))
+
+
 def test_clear_removes_state_file(tmp_path):
     out = tmp_path / "events.jsonl"
     state = _RunState(str(out), make_fp())

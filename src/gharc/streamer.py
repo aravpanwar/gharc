@@ -205,15 +205,42 @@ class _RunState:
 
     def mark_done(self, ts):
         self._done.add(ts.isoformat())
-        with open(self._path, "w", encoding="utf-8") as f:
+        # Write to a temporary file and rename it into place so a crash mid-write
+        # cannot truncate the existing state and lose all completed hours. Called
+        # only from the main thread, so there is no concurrent writer.
+        tmp_path = self._path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(
                 {"fingerprint": self._fingerprint, "done_hours": sorted(self._done)},
                 f,
             )
+        os.replace(tmp_path, self._path)
 
     def clear(self):
         if os.path.exists(self._path):
             os.remove(self._path)
+
+
+class _NoState:
+    """No-op resume state used for Parquet output.
+
+    A closed Parquet file cannot be appended to, so a Parquet run can never be
+    resumed. Tracking completed hours would only add a sidecar file that a
+    rerun could never use, and rewriting it every hour is wasted work, so
+    Parquet runs use this no-op instead.
+    """
+
+    def __len__(self):
+        return 0
+
+    def is_done(self, ts):
+        return False
+
+    def mark_done(self, ts):
+        pass
+
+    def clear(self):
+        pass
 
 
 def _run_fingerprint(start, end, repos, event_types):
@@ -254,7 +281,12 @@ def process_range(start, end, repos, event_types, output, workers):
             connections; values above 4 give diminishing returns.
     """
     fingerprint = _run_fingerprint(start, end, repos, event_types)
-    state = _RunState(output, fingerprint)
+    # Parquet cannot be appended to, so it can never be resumed; skip state
+    # tracking for it rather than write a sidecar file no rerun could use.
+    if str(output).endswith(".parquet"):
+        state = _NoState()
+    else:
+        state = _RunState(output, fingerprint)
 
     resuming = len(state) > 0
     writer = DataWriter(output, append=resuming)
@@ -291,9 +323,11 @@ def process_range(start, end, repos, event_types, output, workers):
                     if data:
                         for record in data:
                             writer.write(record)
-                    # Flush so this hour is durable on disk before we mark it
-                    # done. If the process crashes after mark_done, restart
-                    # skips this hour and the data is already written.
+                    # Flush the hour's events before marking it done. For JSONL
+                    # this makes the appended lines durable so a restart can skip
+                    # the hour and trust what is on disk. For Parquet the row
+                    # group is only readable after close(), so Parquet uses no
+                    # resume state (see _NoState).
                     writer.flush()
                     state.mark_done(ts)
                 except Exception as exc:
