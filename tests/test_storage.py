@@ -140,9 +140,10 @@ def test_parquet_preserves_unknown_top_level_field(tmp_path):
     writer.write({**EVENT_WITHOUT_ORG, "id": "99", "experimental": {"x": 1}})
     writer.close()
 
-    df = pq.read_table(str(out)).to_pandas()
-    assert "other" in df.columns
-    others = {row["id"]: row["other"] for _, row in df.iterrows()}
+    table = pq.read_table(str(out))
+    assert "other" in table.schema.names
+    # Read at the pyarrow level so nulls come back as None across pandas versions.
+    others = dict(zip(table.column("id").to_pylist(), table.column("other").to_pylist()))
     # The plain event has no extra fields, the other one keeps them as JSON.
     assert others["10"] is None
     assert json.loads(others["99"]) == {"experimental": {"x": 1}}
