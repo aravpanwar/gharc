@@ -158,7 +158,11 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
                         # GHArchive occasionally has malformed lines; expected at low rates.
                         continue
         except Exception as e:
-             tqdm.write(f"Error reading gzip for {url}: {e}")
+            # A gzip-level error means the download is truncated or corrupt, so
+            # the events collected so far are an incomplete view of the hour.
+            # Raise rather than return a partial result, so the hour is retried
+            # on resume instead of being recorded as complete.
+            raise RuntimeError(f"Failed to read archive for {url}: {e}")
 
         return results
 
