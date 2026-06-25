@@ -28,6 +28,7 @@ def main():
     p.add_argument("--start", required=True, help="Start date YYYY-MM-DD")
     p.add_argument("--end", required=True, help="End date YYYY-MM-DD (exclusive)")
     p.add_argument("--repos", required=True, help="Comma-separated repos")
+    p.add_argument("--event-types", help="Comma-separated event types (optional)")
     p.add_argument("--output-dir", default="./gharc_out", help="Output directory")
     p.add_argument("--workers", type=int, default=4)
     args = p.parse_args()
@@ -61,6 +62,8 @@ def main():
             "--output", jsonl_file,
             "--workers", str(args.workers),
         ]
+        if args.event_types:
+            download_cmd += ["--event-types", args.event_types]
 
         try:
             subprocess.run(download_cmd, check=True)
