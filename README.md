@@ -146,7 +146,7 @@ Repository names are matched exactly and are case-sensitive, so pass the canonic
 
 ## Resumable runs
 
-For long jobs, `gharc` keeps a small `<output>.state.json` next to the output file listing which hours it has already processed. If the run crashes, restarting the same command picks up where it left off rather than redoing completed hours. The state file is removed automatically when the run finishes cleanly.
+For long jobs, `gharc` keeps a small `<output>.state.json` next to the output file listing which hours it has already processed. If the run crashes, restarting the same command picks up where it left off rather than redoing completed hours. The state file is written atomically (a temporary file renamed into place) so a crash mid-write cannot corrupt it, and it is removed automatically when the run finishes cleanly. Note that `gharc` relies on the operating system to flush writes to disk rather than forcing an `fsync` after each hour, so an abrupt power loss (as opposed to a process crash) could in rare cases leave an hour marked done whose data had not yet reached disk.
 
 Resume support requires JSONL output. Parquet writers cannot append to a closed file, so for multi-hour runs use `--output run.jsonl` and convert to Parquet at the end:
 
