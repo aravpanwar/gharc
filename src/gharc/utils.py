@@ -41,13 +41,11 @@ def date_range(start: datetime, end: datetime) -> Iterator[datetime]:
         current += timedelta(hours=1)
 
 def get_url_for_time(dt: datetime) -> str:
+    """Construct the GHArchive URL for a specific hour.
+
+    GHArchive names files {year}-{month}-{day}-{hour}.json.gz with the hour not
+    zero-padded, so 2024-01-01 15:00 maps to
+    https://data.gharchive.org/2024-01-01-15.json.gz and the 00:00 hour to
+    ...-2024-01-01-0.json.gz.
     """
-    Constructs the GHArchive URL for a specific hour.
-    Example: 2024-01-01 15:00 -> https://data.gharchive.org/2024-01-01-15.json.gz
-    """
-    # GHArchive uses 24-hour format without leading zeros for hours 0-9? 
-    # Actually checking standard GHArchive urls: 2024-01-01-1.json.gz or 01.json.gz?
-    # GHArchive documentation says: {year}-{month}-{day}-{hour}.json.gz
-    # Hour is usually 0-23 (no leading zero required by spec, but usually provided).
-    # Let's use simple integer formatting which works for their redirects.
     return f"https://data.gharchive.org/{dt.year}-{dt.month:02d}-{dt.day:02d}-{dt.hour}.json.gz"
