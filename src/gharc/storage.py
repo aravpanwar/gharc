@@ -82,6 +82,12 @@ class DataWriter:
         self.buffer_size = 10000
         self._pq_writer = None
 
+        if not self.is_parquet and not filename.endswith('.jsonl'):
+            logger.warning(
+                f"Output {filename} has no .parquet or .jsonl suffix; "
+                f"writing JSON lines. Use a .parquet suffix for Parquet output."
+            )
+
         if append and self.is_parquet and os.path.exists(self.filename):
             raise ValueError(
                 f"Cannot resume into existing Parquet file {filename}. "

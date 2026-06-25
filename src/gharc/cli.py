@@ -48,6 +48,11 @@ def download(start, end, repos, event_types, output, workers):
 def convert(input_path, output_path, batch_size):
     """Convert a JSONL output from `gharc download` into a single Parquet file."""
     try:
+        if not output_path.endswith('.parquet'):
+            logger.warning(
+                f"convert always writes Parquet, but {output_path} does not end "
+                f"in .parquet."
+            )
         jsonl_to_parquet(input_path, output_path, batch_size=batch_size)
     except Exception as e:
         logger.error(str(e))
