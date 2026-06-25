@@ -13,7 +13,12 @@ from .utils import logger
 # all of them rather than inferring one from the first batch written. Without
 # this, a run whose first batch lacked `org` would reject every later batch that
 # carried it, dropping those events or leaving a half-written file.
-EVENT_COLUMNS = [
+#
+# Any top-level field outside this set is preserved as JSON in an `other`
+# column rather than dropped, mirroring how the GHArchive BigQuery mirror keeps
+# unrecognized fields. This keeps the Parquet output lossless and consistent
+# with the JSONL output even if GitHub adds a field we do not model.
+EVENT_TOP_LEVEL = [
     "id",
     "type",
     "actor",
@@ -24,6 +29,8 @@ EVENT_COLUMNS = [
     "org",
 ]
 
+EVENT_COLUMNS = EVENT_TOP_LEVEL + ["other"]
+
 EVENT_SCHEMA = pa.schema([
     pa.field("id", pa.string()),
     pa.field("type", pa.string()),
@@ -33,6 +40,7 @@ EVENT_SCHEMA = pa.schema([
     pa.field("public", pa.bool_()),
     pa.field("created_at", pa.string()),
     pa.field("org", pa.string()),
+    pa.field("other", pa.string()),
 ])
 
 
@@ -136,13 +144,20 @@ class DataWriter:
 
 
 def _flatten_event(event: dict) -> dict:
-    # JSON-stringify nested fields so Parquet sees a stable flat schema.
+    # JSON-stringify nested canonical fields so Parquet sees a stable flat
+    # schema, and collect any unrecognized top-level fields into `other` so
+    # nothing is silently dropped.
     out = {}
+    other = {}
     for key, value in event.items():
+        if key not in EVENT_TOP_LEVEL:
+            other[key] = value
+            continue
         if isinstance(value, (dict, list)):
             out[key] = json.dumps(value, ensure_ascii=False)
         else:
             out[key] = value
+    out["other"] = json.dumps(other, ensure_ascii=False) if other else None
     return out
 
 

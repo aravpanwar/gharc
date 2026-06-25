@@ -131,6 +131,24 @@ def test_parquet_handles_optional_org_across_batches(tmp_path, order):
     assert table.column("org").null_count == 1
 
 
+def test_parquet_preserves_unknown_top_level_field(tmp_path):
+    out = tmp_path / "events.parquet"
+    writer = DataWriter(str(out))
+    writer.buffer_size = 1
+
+    writer.write(EVENT_WITHOUT_ORG)
+    writer.write({**EVENT_WITHOUT_ORG, "id": "99", "experimental": {"x": 1}})
+    writer.close()
+
+    table = pq.read_table(str(out))
+    assert "other" in table.schema.names
+    # Read at the pyarrow level so nulls come back as None across pandas versions.
+    others = dict(zip(table.column("id").to_pylist(), table.column("other").to_pylist()))
+    # The plain event has no extra fields, the other one keeps them as JSON.
+    assert others["10"] is None
+    assert json.loads(others["99"]) == {"experimental": {"x": 1}}
+
+
 def test_parquet_empty_run_writes_zero_row_file(tmp_path):
     out = tmp_path / "events.parquet"
     writer = DataWriter(str(out))
