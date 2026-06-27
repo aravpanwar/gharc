@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-27
+
 ### Fixed
 - Parquet output no longer drops events or leaves a half-written file when
   a run mixes events with and without the optional top-level `org` field
@@ -104,6 +106,7 @@ follows [Semantic Versioning](https://semver.org/).
 - JOSS-style paper draft under `paper/`.
 - MIT license, CITATION.cff, Zenodo deposit.
 
+[0.1.3]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.3
 [0.1.2]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.2
 [0.1.1]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.0
