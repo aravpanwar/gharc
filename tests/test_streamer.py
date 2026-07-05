@@ -4,6 +4,8 @@ from gharc.streamer import (
     process_single_hour,
     process_range,
     download_resumable,
+    _RunState,
+    _run_fingerprint,
     DOWNLOAD_OK,
     DOWNLOAD_MISSING,
     DOWNLOAD_RETRY,
@@ -72,6 +74,36 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
 
     # The completed hour stays in the state file so a rerun retries only the
     # failed hour instead of starting over.
+    assert (tmp_path / "out.jsonl.state.json").exists()
+
+
+def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
+    out = tmp_path / "out.jsonl"
+
+    # Pre-seed a checkpoint as if an earlier hour had already completed.
+    fingerprint = _run_fingerprint(
+        datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 3),
+        ["apache/spark"], None, None, None,
+    )
+    seed = _RunState(str(out), fingerprint)
+    seed.mark_done(datetime(2024, 1, 1, 0))
+
+    # The remaining hours raise KeyboardInterrupt as if the user hit Ctrl+C.
+    # The run should stop with a non-zero exit and leave the checkpoint intact.
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
+        raise KeyboardInterrupt
+
+    with patch('gharc.streamer.process_single_hour', side_effect=fake_hour):
+        with pytest.raises(SystemExit):
+            process_range(
+                start=datetime(2024, 1, 1, 0),
+                end=datetime(2024, 1, 1, 3),
+                repos=["apache/spark"],
+                event_types=None,
+                output=str(out),
+                workers=1,
+            )
+
     assert (tmp_path / "out.jsonl.state.json").exists()
 
 

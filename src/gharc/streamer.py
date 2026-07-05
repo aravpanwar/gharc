@@ -313,12 +313,18 @@ def process_range(start, end, repos, event_types, output, workers,
         return
 
     failed = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_time = {
-            executor.submit(process_single_hour, ts, repos, event_types, orgs, actors): ts
-            for ts in todo
-        }
+    # Own the executor explicitly rather than through a `with` block: on
+    # Ctrl+C we want to cancel the hours that have not started yet, but a
+    # `with` block's exit calls shutdown(wait=True), which drains the whole
+    # queue instead. On a long run that means Ctrl+C would keep downloading
+    # for a long time before stopping.
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+    future_to_time = {
+        executor.submit(process_single_hour, ts, repos, event_types, orgs, actors): ts
+        for ts in todo
+    }
 
+    try:
         with tqdm(
             total=len(todo),
             desc="Processing",
@@ -346,6 +352,18 @@ def process_range(start, end, repos, event_types, output, workers,
                     tqdm.write(f"Worker exception for {ts}: {exc}")
                 finally:
                     pbar.update(1)
+    except KeyboardInterrupt:
+        # Cancel the hours still queued so we stop soon rather than draining
+        # the pool. Any rows buffered for an hour that was not marked done are
+        # dropped, and the kept state file lets a rerun resume from the last
+        # completed hour.
+        executor.shutdown(wait=False, cancel_futures=True)
+        writer.buffer.clear()
+        writer.close()
+        logger.warning("Interrupted; stopping. Rerun the same command to resume.")
+        raise SystemExit(130)
+    finally:
+        executor.shutdown(wait=True)
 
     writer.close()
 
