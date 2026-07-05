@@ -15,7 +15,7 @@
 
 ## Why gharc?
 
-The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis requires either massive local storage or a cloud-warehouse account (BigQuery, Snowflake).
+The full GitHub Archive spans every public event since 2011: tens of terabytes compressed, and several petabytes uncompressed. Traditional analysis requires either massive local storage or a cloud-warehouse account (BigQuery, Snowflake).
 
 `gharc` solves this by implementing a **Stream-and-Filter** architecture:
 1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
