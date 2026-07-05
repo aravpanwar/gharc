@@ -6,6 +6,32 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Owner wildcards in `--repos` (for example `apache/*`), plus `--orgs` and
+  `--actors` filters. `--repos` and `--orgs` are combined, and `--event-types`
+  and `--actors` further narrow the result.
+- `--version` prints the installed version, and `--debug` turns on verbose
+  logging (including a full traceback on error).
+
+### Changed
+- Ctrl+C now stops a run promptly by cancelling the hours that have not
+  started, instead of draining the whole queue first. The checkpoint is kept
+  so a rerun resumes.
+- JSONL resume is now exactly-once: each completed hour records the output
+  byte offset, and a resume trims any rows left by an interrupted hour rather
+  than appending them again. A resume also stops with an error if the output
+  is shorter than its checkpoint (truncated or deleted).
+- JSONL output is written as UTF-8 without escaping non-ASCII characters,
+  matching the Parquet output and keeping non-English text readable.
+- `download` rejects a `--start` in the future and warns when `--end` is very
+  recent, and it reports how many hours in the window had no published archive.
+- `download` warns when a window starts before 2015-01-01 and a repository or
+  owner filter is set, since GHArchive uses the older Timeline schema there.
+- Empty filter tokens (as in `apache/spark,,foo`) are dropped, and `--workers`
+  must be at least 1.
+- The package no longer depends on pandas; Parquet tables are built directly
+  with pyarrow.
+
 ## [0.1.3] - 2026-06-27
 
 ### Fixed
