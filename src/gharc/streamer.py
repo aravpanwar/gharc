@@ -402,13 +402,19 @@ def process_range(start, end, repos, event_types, output, workers,
     except KeyboardInterrupt:
         # Cancel the hours still queued so we stop soon rather than draining
         # the pool. Any rows buffered for an hour that was not marked done are
-        # dropped, and the kept state file lets a rerun resume from the last
-        # completed hour.
+        # dropped. KeyboardInterrupt is re-raised so an API caller sees the
+        # normal interrupt; the CLI turns it into a non-zero exit.
         executor.shutdown(wait=False, cancel_futures=True)
         writer.buffer.clear()
         writer.close()
-        logger.warning("Interrupted; stopping. Rerun the same command to resume.")
-        raise SystemExit(130)
+        if writer.is_parquet:
+            logger.warning(
+                "Interrupted; stopping. Parquet output cannot resume, so rerun "
+                "to start the window over."
+            )
+        else:
+            logger.warning("Interrupted; stopping. Rerun the same command to resume.")
+        raise
     finally:
         executor.shutdown(wait=True)
 

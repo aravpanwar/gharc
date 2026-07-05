@@ -2,7 +2,7 @@
 import click
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from . import __version__
 from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
@@ -54,7 +54,7 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
             )
         if workers < 1:
             raise ValueError(f"--workers must be at least 1 (got {workers}).")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if s_dt >= now:
             raise ValueError(
                 f"--start ({start}) is in the future; GHArchive has no data for "
@@ -80,6 +80,10 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
         process_range(s_dt, e_dt, repo_list, type_list, output, workers,
                       orgs=org_list, actors=actor_list)
 
+    except KeyboardInterrupt:
+        # process_range has already cleaned up and logged; exit with the
+        # conventional SIGINT status.
+        sys.exit(130)
     except Exception as e:
         logger.error(str(e))
         logger.debug("Full traceback:", exc_info=True)

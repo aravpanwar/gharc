@@ -91,12 +91,13 @@ def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
     seed.mark_done(datetime(2024, 1, 1, 0))
 
     # The remaining hours raise KeyboardInterrupt as if the user hit Ctrl+C.
-    # The run should stop with a non-zero exit and leave the checkpoint intact.
+    # process_range re-raises it (the CLI turns that into a non-zero exit) and
+    # leaves the checkpoint intact.
     def fake_hour(dt, repos, event_types, orgs=None, actors=None):
         raise KeyboardInterrupt
 
     with patch('gharc.streamer.process_single_hour', side_effect=fake_hour):
-        with pytest.raises(SystemExit):
+        with pytest.raises(KeyboardInterrupt):
             process_range(
                 start=datetime(2024, 1, 1, 0),
                 end=datetime(2024, 1, 1, 3),

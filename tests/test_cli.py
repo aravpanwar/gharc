@@ -61,6 +61,15 @@ def test_download_passes_parsed_filters_to_process_range():
     assert kwargs["actors"] == ["bob"]
 
 
+def test_download_keyboard_interrupt_exits_130():
+    with patch("gharc.cli.process_range", side_effect=KeyboardInterrupt):
+        result = CliRunner().invoke(main, [
+            "download", "--start", "2024-01-01", "--end", "2024-01-02",
+            "--output", "x.jsonl",
+        ])
+    assert result.exit_code == 130
+
+
 def test_convert_dispatches_to_jsonl_to_parquet(tmp_path):
     src = tmp_path / "in.jsonl"
     src.write_text('{"id": "1"}\n', encoding="utf-8")
