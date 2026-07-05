@@ -39,6 +39,17 @@ def test_jsonl_round_trip(tmp_path):
     assert json.loads(lines[1])["type"] == "WatchEvent"
 
 
+def test_jsonl_writes_utf8_without_escaping(tmp_path):
+    out = tmp_path / "events.jsonl"
+    writer = DataWriter(str(out))
+    writer.write({"id": "1", "type": "PushEvent", "payload": {"msg": "café 日本語"}})
+    writer.close()
+
+    text = out.read_text(encoding="utf-8")
+    assert "café 日本語" in text
+    assert "\\u" not in text
+
+
 def test_jsonl_truncates_on_rerun(tmp_path):
     out = tmp_path / "events.jsonl"
 

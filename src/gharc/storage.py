@@ -122,7 +122,10 @@ class DataWriter:
         else:
             with open(self.filename, 'a', encoding='utf-8') as f:
                 for rec in self.buffer:
-                    f.write(json.dumps(rec) + '\n')
+                    # ensure_ascii=False keeps non-English text readable and
+                    # smaller, and matches how nested fields are stored for
+                    # Parquet in _flatten_event.
+                    f.write(json.dumps(rec, ensure_ascii=False) + '\n')
 
         self.buffer = []
 
