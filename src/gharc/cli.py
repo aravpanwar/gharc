@@ -66,6 +66,13 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
         org_list = _split_csv(orgs)
         actor_list = _split_csv(actors)
 
+        if s_dt < datetime(2015, 1, 1) and (repo_list or org_list):
+            logger.warning(
+                "Window starts before 2015-01-01, where GHArchive uses the older "
+                "Timeline schema without repo.name; repository and owner filters "
+                "may match nothing for those hours."
+            )
+
         process_range(s_dt, e_dt, repo_list, type_list, output, workers,
                       orgs=org_list, actors=actor_list)
         
