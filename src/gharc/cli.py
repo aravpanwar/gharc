@@ -1,6 +1,7 @@
 # src/gharc/cli.py
 import click
 import sys
+from datetime import datetime
 from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
 from .storage import jsonl_to_parquet
@@ -49,6 +50,17 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
             )
         if workers < 1:
             raise ValueError(f"--workers must be at least 1 (got {workers}).")
+        now = datetime.utcnow()
+        if s_dt >= now:
+            raise ValueError(
+                f"--start ({start}) is in the future; GHArchive has no data for "
+                f"that window yet. Dates are UTC."
+            )
+        if e_dt > now:
+            logger.warning(
+                "--end is in the future or very recent; GHArchive publishes each "
+                "hour a little after it ends, so the latest hours may be missing."
+            )
         repo_list = _split_csv(repos)
         type_list = _split_csv(event_types)
         org_list = _split_csv(orgs)

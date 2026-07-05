@@ -40,9 +40,10 @@ def test_process_single_hour_raises_on_persistent_download_failure(_mock):
 
 
 @patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_MISSING)
-def test_process_single_hour_returns_empty_on_missing_archive(_mock):
+def test_process_single_hour_returns_none_on_missing_archive(_mock):
+    # None (not []) so the caller can tell an absent hour from an empty one.
     result = process_single_hour(datetime(2024, 1, 1, 0), repos=["apache/spark"], event_types=None)
-    assert result == []
+    assert result is None
 
 
 @patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_OK)

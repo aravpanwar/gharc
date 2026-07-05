@@ -98,7 +98,9 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                         orgs: list = None, actors: list = None):
     """Download one hour, keep matching events, delete the temp file.
 
-    Returns the list of events matching the filters (possibly empty).
+    Returns the list of events matching the filters (possibly empty), or None if
+    GHArchive has no archive for that hour (a known gap), so the caller can tell
+    an absent hour apart from an hour that simply had no matches.
     """
     url = get_url_for_time(dt)
     results = []
@@ -123,8 +125,8 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                 download_success = True
                 break
             if status == DOWNLOAD_MISSING:
-                logger.warning(f"No archive available at {url}; treating as zero events")
-                return []
+                logger.debug(f"No archive available at {url}")
+                return None
             time.sleep(2)
 
         if not download_success:
@@ -351,6 +353,7 @@ def process_range(start, end, repos, event_types, output, workers,
         return
 
     failed = []
+    missing = 0
     # Own the executor explicitly rather than through a `with` block: on
     # Ctrl+C we want to cancel the hours that have not started yet, but a
     # `with` block's exit calls shutdown(wait=True), which drains the whole
@@ -375,7 +378,10 @@ def process_range(start, end, repos, event_types, output, workers,
                 ts = future_to_time[future]
                 try:
                     data = future.result()
-                    if data:
+                    if data is None:
+                        # No archive published for this hour (a known gap).
+                        missing += 1
+                    elif data:
                         for record in data:
                             writer.write(record)
                     # Flush the hour's events before marking it done. For JSONL
@@ -407,6 +413,12 @@ def process_range(start, end, repos, event_types, output, workers,
         executor.shutdown(wait=True)
 
     writer.close()
+
+    if missing:
+        logger.info(
+            f"{missing} of {len(todo)} hours had no published archive and were "
+            f"counted as zero events."
+        )
 
     if failed:
         # Signal the failure rather than reporting a clean finish over partial
