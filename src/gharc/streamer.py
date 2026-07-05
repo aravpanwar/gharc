@@ -186,6 +186,10 @@ class _RunState:
         self._path = str(output_path) + ".state.json"
         self._fingerprint = fingerprint
         self._done = set()
+        # Byte length of the JSONL output at the last completed hour. Rows
+        # written past this offset belong to an hour that was interrupted
+        # before it was marked done, so a resume trims back to here.
+        self._committed_offset = 0
         if os.path.exists(self._path):
             try:
                 with open(self._path, "r", encoding="utf-8") as f:
@@ -199,22 +203,32 @@ class _RunState:
                     f"(window or filters changed). Remove it or use a new --output."
                 )
             self._done = set(payload.get("done_hours", []))
+            self._committed_offset = payload.get("committed_offset", 0)
 
     def __len__(self):
         return len(self._done)
 
+    @property
+    def committed_offset(self):
+        return self._committed_offset
+
     def is_done(self, ts):
         return ts.isoformat() in self._done
 
-    def mark_done(self, ts):
+    def mark_done(self, ts, offset=0):
         self._done.add(ts.isoformat())
+        self._committed_offset = offset
         # Write to a temporary file and rename it into place so a crash mid-write
         # cannot truncate the existing state and lose all completed hours. Called
         # only from the main thread, so there is no concurrent writer.
         tmp_path = self._path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(
-                {"fingerprint": self._fingerprint, "done_hours": sorted(self._done)},
+                {
+                    "fingerprint": self._fingerprint,
+                    "done_hours": sorted(self._done),
+                    "committed_offset": self._committed_offset,
+                },
                 f,
             )
         os.replace(tmp_path, self._path)
@@ -233,13 +247,15 @@ class _NoState:
     Parquet runs use this no-op instead.
     """
 
+    committed_offset = 0
+
     def __len__(self):
         return 0
 
     def is_done(self, ts):
         return False
 
-    def mark_done(self, ts):
+    def mark_done(self, ts, offset=0):
         pass
 
     def clear(self):
@@ -255,6 +271,26 @@ def _run_fingerprint(start, end, repos, event_types, orgs, actors):
         "orgs": sorted(orgs) if orgs else None,
         "actors": sorted(actors) if actors else None,
     }
+
+
+def _reconcile_jsonl_offset(output, committed_offset):
+    """Line up a JSONL output with its resume checkpoint before appending.
+
+    Rows past ``committed_offset`` belong to an hour that was interrupted
+    before it was marked done, so they are trimmed to keep resume exactly-once.
+    An output shorter than the checkpoint means it was truncated or deleted, so
+    the checkpoint can no longer be trusted and the run stops with an error.
+    """
+    size = os.path.getsize(output) if os.path.exists(output) else 0
+    if size < committed_offset:
+        raise ValueError(
+            f"{output} is shorter than its resume checkpoint "
+            f"({size} < {committed_offset} bytes); it looks truncated or "
+            f"deleted. Remove {output}.state.json to start the window over."
+        )
+    if size > committed_offset:
+        with open(output, "r+b") as f:
+            f.truncate(committed_offset)
 
 
 def process_range(start, end, repos, event_types, output, workers,
@@ -301,6 +337,8 @@ def process_range(start, end, repos, event_types, output, workers,
 
     resuming = len(state) > 0
     writer = DataWriter(output, append=resuming)
+    if resuming and not writer.is_parquet:
+        _reconcile_jsonl_offset(output, state.committed_offset)
     all_timestamps = list(date_range(start, end))
     todo = [t for t in all_timestamps if not state.is_done(t)]
     skipped = len(all_timestamps) - len(todo)
@@ -344,9 +382,12 @@ def process_range(start, end, repos, event_types, output, workers,
                     # this makes the appended lines durable so a restart can skip
                     # the hour and trust what is on disk. For Parquet the row
                     # group is only readable after close(), so Parquet uses no
-                    # resume state (see _NoState).
+                    # resume state (see _NoState). The committed byte offset is
+                    # recorded with the hour so a resume can trim a partially
+                    # written hour and stay exactly-once.
                     writer.flush()
-                    state.mark_done(ts)
+                    offset = os.path.getsize(output) if os.path.exists(output) else 0
+                    state.mark_done(ts, offset)
                 except Exception as exc:
                     failed.append(ts)
                     tqdm.write(f"Worker exception for {ts}: {exc}")
