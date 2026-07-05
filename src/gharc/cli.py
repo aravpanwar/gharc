@@ -1,7 +1,9 @@
 # src/gharc/cli.py
 import click
+import logging
 import sys
 from datetime import datetime
+from . import __version__
 from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
 from .storage import jsonl_to_parquet
@@ -21,9 +23,11 @@ def _split_csv(raw):
 
 
 @click.group()
-def main():
+@click.version_option(version=__version__, prog_name="gharc")
+@click.option('--debug', is_flag=True, help='Enable verbose debug logging.')
+def main(debug):
     """gharc: Stream-filter GitHub Archive data."""
-    setup_logging()
+    setup_logging(logging.DEBUG if debug else logging.INFO)
 
 @main.command()
 @click.option('--start', required=True, help='Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
@@ -75,9 +79,10 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
 
         process_range(s_dt, e_dt, repo_list, type_list, output, workers,
                       orgs=org_list, actors=actor_list)
-        
+
     except Exception as e:
         logger.error(str(e))
+        logger.debug("Full traceback:", exc_info=True)
         sys.exit(1)
 
 
@@ -96,6 +101,7 @@ def convert(input_path, output_path, batch_size):
         jsonl_to_parquet(input_path, output_path, batch_size=batch_size)
     except Exception as e:
         logger.error(str(e))
+        logger.debug("Full traceback:", exc_info=True)
         sys.exit(1)
 
 

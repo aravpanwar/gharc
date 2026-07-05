@@ -7,15 +7,19 @@ logger = logging.getLogger("gharc")
 
 
 def setup_logging(level: int = logging.INFO) -> None:
-    """Attach a console handler to the gharc logger. Safe to call twice."""
-    if logger.handlers:
-        return
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        '[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%H:%M:%S',
-    ))
-    logger.addHandler(handler)
+    """Attach a console handler to the gharc logger and set its level.
+
+    Safe to call more than once: the handler is added only on the first call,
+    but the level is always applied so a later call (for example ``--debug``)
+    takes effect.
+    """
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter(
+            '[%(asctime)s] %(levelname)s: %(message)s',
+            datefmt='%H:%M:%S',
+        ))
+        logger.addHandler(handler)
     logger.setLevel(level)
 
 def parse_date(date_str: str) -> datetime:
