@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -47,37 +48,39 @@ def main():
         sys.exit(1)
 
     table = pq.read_table(str(out))
-    df = table.to_pandas()
+    num_rows = table.num_rows
+    columns = table.schema.names
 
     print()
     print(f"Output: {out}")
-    print(f"Rows: {len(df)}")
+    print(f"Rows: {num_rows}")
     print(f"File size: {out.stat().st_size:,} bytes")
     print(f"Elapsed: {elapsed:.1f}s")
-    print(f"Columns: {list(df.columns)}")
+    print(f"Columns: {columns}")
 
-    if len(df):
-        first = df.iloc[0]
-        print(f"\nFirst event id: {first['id']}")
-        print(f"First event type: {first['type']}")
-        repo = json.loads(first["repo"])
-        print(f"First event repo: {repo['name']}")
+    if num_rows:
+        ids = table.column("id").to_pylist()
+        event_types = table.column("type").to_pylist()
+        repo_json = table.column("repo").to_pylist()
+
+        print(f"\nFirst event id: {ids[0]}")
+        print(f"First event type: {event_types[0]}")
+        print(f"First event repo: {json.loads(repo_json[0])['name']}")
 
         # Every row should belong to apache/spark; the filter should not leak.
-        repos = {json.loads(r)["name"] for r in df["repo"]}
+        repos = {json.loads(r)["name"] for r in repo_json}
         if repos != {"apache/spark"}:
             print(f"\nFAIL: filter leaked, found repos: {repos}")
             sys.exit(1)
 
-        types = df["type"].value_counts().to_dict()
-        print(f"Event-type breakdown: {types}")
+        print(f"Event-type breakdown: {dict(Counter(event_types))}")
 
     summary = {
         "window": [start.isoformat(), end.isoformat()],
-        "rows": len(df),
+        "rows": num_rows,
         "file_size_bytes": out.stat().st_size,
         "elapsed_seconds": round(elapsed, 2),
-        "columns": list(df.columns),
+        "columns": columns,
     }
     summary_path = RESULTS_DIR / "smoke_summary.json"
     summary_path.write_text(json.dumps(summary, indent=2))
