@@ -27,15 +27,17 @@ def main():
 @main.command()
 @click.option('--start', required=True, help='Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
 @click.option('--end', required=True, help='End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
-@click.option('--repos', help='Comma-separated repos (e.g. apache/spark)')
+@click.option('--repos', help='Comma-separated repos; supports owner/* wildcards (e.g. apache/spark, apache/*)')
+@click.option('--orgs', help='Comma-separated repository owners to keep (e.g. apache)')
+@click.option('--actors', help='Comma-separated actor logins to keep (e.g. dongjoon-hyun)')
 @click.option('--event-types', help='Comma-separated events (e.g. PushEvent)')
 @click.option('--output', default='filtered.jsonl', help='Output file')
 @click.option('--workers', default=4, help='Parallel downloads')
-def download(start, end, repos, event_types, output, workers):
+def download(start, end, repos, orgs, actors, event_types, output, workers):
     """Stream GHArchive over a date range and write matching events.
 
-    Filters by repository and event type, writing Parquet or JSONL chosen by
-    the --output suffix. --end is exclusive.
+    Filters by repository, owner, actor, and event type, writing Parquet or
+    JSONL chosen by the --output suffix. --end is exclusive. Dates are UTC.
     """
     try:
         s_dt = parse_date(start)
@@ -49,8 +51,11 @@ def download(start, end, repos, event_types, output, workers):
             raise ValueError(f"--workers must be at least 1 (got {workers}).")
         repo_list = _split_csv(repos)
         type_list = _split_csv(event_types)
+        org_list = _split_csv(orgs)
+        actor_list = _split_csv(actors)
 
-        process_range(s_dt, e_dt, repo_list, type_list, output, workers)
+        process_range(s_dt, e_dt, repo_list, type_list, output, workers,
+                      orgs=org_list, actors=actor_list)
         
     except Exception as e:
         logger.error(str(e))

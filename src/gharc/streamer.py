@@ -12,7 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from tqdm import tqdm
 from .utils import get_url_for_time, date_range, logger
-from .filters import passes_filters, fast_string_check
+from .filters import passes_filters, fast_string_check, prefilter_tokens
 from .storage import DataWriter
 
 # Use orjson if available for 3-5x faster parsing
@@ -94,18 +94,21 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> s
         logger.debug(f"Download attempt failed for {url}: {e}")
         return DOWNLOAD_RETRY
 
-def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
-    """
-    Downloads with resume -> Process -> Delete.
+def process_single_hour(dt: datetime, repos: list, event_types: list,
+                        orgs: list = None, actors: list = None):
+    """Download one hour, keep matching events, delete the temp file.
+
+    Returns the list of events matching the filters (possibly empty).
     """
     url = get_url_for_time(dt)
     results = []
-    # Convert filters to bytes if using orjson for speed
+    tokens = prefilter_tokens(repos, event_types, orgs, actors)
+    # Convert filters to bytes if using orjson for speed.
     if HAS_ORJSON:
-        fast_tokens = [t.encode('utf-8') for t in ((repos if repos else []) + (event_types if event_types else []))]
+        fast_tokens = [t.encode('utf-8') for t in tokens]
     else:
-        fast_tokens = (repos if repos else []) + (event_types if event_types else [])
-        
+        fast_tokens = tokens
+
     session = _session_for_thread()
 
     fd, temp_path = tempfile.mkstemp(suffix=".json.gz")
@@ -152,7 +155,7 @@ def process_single_hour(dt: datetime, repos: list, event_types: list) -> list:
                                 continue
                             event = json.loads(decoded)
 
-                        if passes_filters(event, repos, event_types):
+                        if passes_filters(event, repos, event_types, orgs, actors):
                             results.append(event)
                     except Exception:
                         # GHArchive occasionally has malformed lines; expected at low rates.
@@ -243,16 +246,19 @@ class _NoState:
         pass
 
 
-def _run_fingerprint(start, end, repos, event_types):
+def _run_fingerprint(start, end, repos, event_types, orgs, actors):
     return {
         "start": start.isoformat(),
         "end": end.isoformat(),
         "repos": sorted(repos) if repos else None,
         "event_types": sorted(event_types) if event_types else None,
+        "orgs": sorted(orgs) if orgs else None,
+        "actors": sorted(actors) if actors else None,
     }
 
 
-def process_range(start, end, repos, event_types, output, workers):
+def process_range(start, end, repos, event_types, output, workers,
+                  orgs=None, actors=None):
     """Stream-and-filter GHArchive over [start, end) and write matching events.
 
     Hours in the range are dispatched to a thread pool. Each worker downloads
@@ -279,8 +285,13 @@ def process_range(start, end, repos, event_types, output, workers):
             selects the writer.
         workers: Size of the thread pool. Network-bound on residential
             connections; values above 4 give diminishing returns.
+        orgs: Optional list of repository owners to keep (an event passes when
+            its owner is listed, or its repo matches ``repos``); ``None`` keeps
+            all owners.
+        actors: Optional list of actor logins to keep; ``None`` keeps all
+            actors.
     """
-    fingerprint = _run_fingerprint(start, end, repos, event_types)
+    fingerprint = _run_fingerprint(start, end, repos, event_types, orgs, actors)
     # Parquet cannot be appended to, so it can never be resumed; skip state
     # tracking for it rather than write a sidecar file no rerun could use.
     if str(output).endswith(".parquet"):
@@ -304,7 +315,7 @@ def process_range(start, end, repos, event_types, output, workers):
     failed = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_time = {
-            executor.submit(process_single_hour, ts, repos, event_types): ts
+            executor.submit(process_single_hour, ts, repos, event_types, orgs, actors): ts
             for ts in todo
         }
 

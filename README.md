@@ -135,12 +135,14 @@ gharc download \
 | --- | --- | --- |
 | `--start` | Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-01-01` |
 | `--end` | End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-02-01` |
-| `--repos` | Comma-separated list of repositories to keep | `apache/spark,tensorflow/tensorflow` |
+| `--repos` | Comma-separated repositories to keep; supports `owner/*` wildcards | `apache/spark,apache/*` |
+| `--orgs` | Comma-separated repository owners to keep | `apache,pandas-dev` |
+| `--actors` | Comma-separated actor logins to keep | `dongjoon-hyun,cloud-fan` |
 | `--event-types` | Comma-separated list of GHArchive event types | `WatchEvent,ForkEvent` |
 | `--output` | Output filename (`.parquet` or `.jsonl`) | `data.parquet` |
 | `--workers` | Number of parallel download threads (default: 4) | `8` |
 
-Repository names are matched exactly and are case-sensitive, so pass the canonical `owner/name` as it appears on GitHub (for example `apache/spark`).
+Repository names are matched exactly and are case-sensitive, so pass the canonical `owner/name` as it appears on GitHub (for example `apache/spark`). Use `apache/*` or `--orgs apache` to keep every repository under an owner. `--repos` and `--orgs` are combined (an event is kept if it matches either), while `--event-types` and `--actors` further narrow the result.
 
 ---
 

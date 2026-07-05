@@ -54,7 +54,7 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
     out = tmp_path / "out.jsonl"
 
     # First hour succeeds with no matches, second hour raises.
-    def fake_hour(dt, repos, event_types):
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
         if dt.hour == 1:
             raise RuntimeError("boom")
         return []
@@ -96,7 +96,7 @@ def test_process_range_parquet_uses_no_state_file(tmp_path):
 def test_process_range_parquet_failure_clears_state(tmp_path):
     out = tmp_path / "out.parquet"
 
-    def fake_hour(dt, repos, event_types):
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
         if dt.hour == 1:
             raise RuntimeError("boom")
         return []
