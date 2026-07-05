@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-28
+
 ### Added
 - Owner wildcards in `--repos` (for example `apache/*`), plus `--orgs` and
   `--actors` filters. `--repos` and `--orgs` are combined, and `--event-types`
@@ -132,6 +134,7 @@ follows [Semantic Versioning](https://semver.org/).
 - JOSS-style paper draft under `paper/`.
 - MIT license, CITATION.cff, Zenodo deposit.
 
+[0.1.4]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.4
 [0.1.3]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.3
 [0.1.2]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.2
 [0.1.1]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.1
