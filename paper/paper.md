@@ -69,6 +69,6 @@ The source code is hosted at `github.com/aravpanwar/gharc` under the MIT license
 
 # Acknowledgements
 
-The author thanks Ilya Grigorik and the GHArchive maintainers for the public dataset on which this tool depends, and the maintainers of the `requests` [@reitz2011requests], `pandas` [@mckinney2010data], `pyarrow` [@apachearrow], `tqdm`, and `orjson` libraries that `gharc` builds on.
+The author thanks Ilya Grigorik and the GHArchive maintainers for the public dataset on which this tool depends, and the maintainers of the `requests` [@reitz2011requests], `pyarrow` [@apachearrow], `tqdm`, and `orjson` libraries that `gharc` builds on.
 
 # References

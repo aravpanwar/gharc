@@ -10,6 +10,8 @@ def make_fp():
         datetime(2024, 1, 2),
         ["apache/spark"],
         None,
+        None,
+        None,
     )
 
 
@@ -43,6 +45,8 @@ def test_fingerprint_mismatch_raises(tmp_path):
         datetime(2024, 1, 1),
         datetime(2024, 1, 2),
         ["pandas-dev/pandas"],  # different repos
+        None,
+        None,
         None,
     )
 

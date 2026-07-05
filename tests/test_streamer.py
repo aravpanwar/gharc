@@ -1,9 +1,12 @@
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 from gharc.streamer import (
     process_single_hour,
     process_range,
     download_resumable,
+    _RunState,
+    _run_fingerprint,
     DOWNLOAD_OK,
     DOWNLOAD_MISSING,
     DOWNLOAD_RETRY,
@@ -37,9 +40,10 @@ def test_process_single_hour_raises_on_persistent_download_failure(_mock):
 
 
 @patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_MISSING)
-def test_process_single_hour_returns_empty_on_missing_archive(_mock):
+def test_process_single_hour_returns_none_on_missing_archive(_mock):
+    # None (not []) so the caller can tell an absent hour from an empty one.
     result = process_single_hour(datetime(2024, 1, 1, 0), repos=["apache/spark"], event_types=None)
-    assert result == []
+    assert result is None
 
 
 @patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_OK)
@@ -54,7 +58,7 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
     out = tmp_path / "out.jsonl"
 
     # First hour succeeds with no matches, second hour raises.
-    def fake_hour(dt, repos, event_types):
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
         if dt.hour == 1:
             raise RuntimeError("boom")
         return []
@@ -73,6 +77,86 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
     # The completed hour stays in the state file so a rerun retries only the
     # failed hour instead of starting over.
     assert (tmp_path / "out.jsonl.state.json").exists()
+
+
+def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
+    out = tmp_path / "out.jsonl"
+
+    # Pre-seed a checkpoint as if an earlier hour had already completed.
+    fingerprint = _run_fingerprint(
+        datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 3),
+        ["apache/spark"], None, None, None,
+    )
+    seed = _RunState(str(out), fingerprint)
+    seed.mark_done(datetime(2024, 1, 1, 0))
+
+    # The remaining hours raise KeyboardInterrupt as if the user hit Ctrl+C.
+    # process_range re-raises it (the CLI turns that into a non-zero exit) and
+    # leaves the checkpoint intact.
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
+        raise KeyboardInterrupt
+
+    with patch('gharc.streamer.process_single_hour', side_effect=fake_hour):
+        with pytest.raises(KeyboardInterrupt):
+            process_range(
+                start=datetime(2024, 1, 1, 0),
+                end=datetime(2024, 1, 1, 3),
+                repos=["apache/spark"],
+                event_types=None,
+                output=str(out),
+                workers=1,
+            )
+
+    assert (tmp_path / "out.jsonl.state.json").exists()
+
+
+def test_resume_trims_uncommitted_tail(tmp_path):
+    out = tmp_path / "out.jsonl"
+
+    # One committed line for hour 0, plus a stale line from an hour that was
+    # interrupted before it was checkpointed.
+    committed = json.dumps({"id": "committed"}) + "\n"
+    out.write_text(committed + json.dumps({"id": "stale"}) + "\n", encoding="utf-8")
+
+    fingerprint = _run_fingerprint(
+        datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2), None, None, None, None
+    )
+    state = _RunState(str(out), fingerprint)
+    state.mark_done(datetime(2024, 1, 1, 0), len(committed.encode("utf-8")))
+
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
+        return [{"id": "hour1"}]
+
+    with patch("gharc.streamer.process_single_hour", side_effect=fake_hour):
+        process_range(
+            datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2),
+            None, None, str(out), 1,
+        )
+
+    ids = [json.loads(line)["id"] for line in out.read_text(encoding="utf-8").splitlines()]
+    # The stale line is trimmed and hour 1 is appended once, so no duplication.
+    assert ids == ["committed", "hour1"]
+
+
+def test_resume_errors_when_output_shorter_than_checkpoint(tmp_path):
+    out = tmp_path / "out.jsonl"
+
+    fingerprint = _run_fingerprint(
+        datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2), None, None, None, None
+    )
+    state = _RunState(str(out), fingerprint)
+    # Checkpoint claims committed bytes, but the output file is gone.
+    state.mark_done(datetime(2024, 1, 1, 0), 500)
+
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
+        return []
+
+    with patch("gharc.streamer.process_single_hour", side_effect=fake_hour):
+        with pytest.raises(ValueError, match="shorter than its resume checkpoint"):
+            process_range(
+                datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2),
+                None, None, str(out), 1,
+            )
 
 
 def test_process_range_parquet_uses_no_state_file(tmp_path):
@@ -96,7 +180,7 @@ def test_process_range_parquet_uses_no_state_file(tmp_path):
 def test_process_range_parquet_failure_clears_state(tmp_path):
     out = tmp_path / "out.parquet"
 
-    def fake_hour(dt, repos, event_types):
+    def fake_hour(dt, repos, event_types, orgs=None, actors=None):
         if dt.hour == 1:
             raise RuntimeError("boom")
         return []

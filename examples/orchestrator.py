@@ -1,8 +1,11 @@
 """Run gharc month-by-month over a long date range.
 
-Useful when you're working on a laptop and want one parquet file per month
-rather than one giant file. Edit the configuration at the top to fit your
-machine, then run: python examples/orchestrator.py
+Useful when you're working on a laptop and want one Parquet file per month
+rather than one giant file. Pass the date range, repositories, and output
+directory as command-line flags, for example:
+
+    python examples/orchestrator.py --start 2023-01-01 --end 2024-01-01 \\
+        --repos apache/spark --output-dir ./gharc_out
 """
 import argparse
 import os

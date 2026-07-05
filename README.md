@@ -15,7 +15,7 @@
 
 ## Why gharc?
 
-The full GitHub Archive dataset exceeds petabytes in size. Traditional analysis requires either massive local storage or a cloud-warehouse account (BigQuery, Snowflake).
+The full GitHub Archive spans every public event since 2011: tens of terabytes compressed, and several petabytes uncompressed. Traditional analysis requires either massive local storage or a cloud-warehouse account (BigQuery, Snowflake).
 
 `gharc` solves this by implementing a **Stream-and-Filter** architecture:
 1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
@@ -133,14 +133,18 @@ gharc download \
 
 | Argument | Description | Example |
 | --- | --- | --- |
-| `--start` | Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-01-01` |
-| `--end` | End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-02-01` |
-| `--repos` | Comma-separated list of repositories to keep | `apache/spark,tensorflow/tensorflow` |
+| `--start` | Start date in UTC, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-01-01` |
+| `--end` | End date in UTC, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-02-01` |
+| `--repos` | Comma-separated repositories to keep; supports `owner/*` wildcards | `apache/spark,apache/*` |
+| `--orgs` | Comma-separated repository owners to keep | `apache,pandas-dev` |
+| `--actors` | Comma-separated actor logins to keep | `dongjoon-hyun,cloud-fan` |
 | `--event-types` | Comma-separated list of GHArchive event types | `WatchEvent,ForkEvent` |
 | `--output` | Output filename (`.parquet` or `.jsonl`) | `data.parquet` |
 | `--workers` | Number of parallel download threads (default: 4) | `8` |
 
-Repository names are matched exactly and are case-sensitive, so pass the canonical `owner/name` as it appears on GitHub (for example `apache/spark`).
+Dates are interpreted as UTC, matching GHArchive's hourly file naming.
+
+Repository names are matched exactly and are case-sensitive, so pass the canonical `owner/name` as it appears on GitHub (for example `apache/spark`). Use `apache/*` or `--orgs apache` to keep every repository under an owner. `--repos` and `--orgs` are combined (an event is kept if it matches either), while `--event-types` and `--actors` further narrow the result.
 
 ---
 

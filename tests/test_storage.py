@@ -39,6 +39,17 @@ def test_jsonl_round_trip(tmp_path):
     assert json.loads(lines[1])["type"] == "WatchEvent"
 
 
+def test_jsonl_writes_utf8_without_escaping(tmp_path):
+    out = tmp_path / "events.jsonl"
+    writer = DataWriter(str(out))
+    writer.write({"id": "1", "type": "PushEvent", "payload": {"msg": "café 日本語"}})
+    writer.close()
+
+    text = out.read_text(encoding="utf-8")
+    assert "café 日本語" in text
+    assert "\\u" not in text
+
+
 def test_jsonl_truncates_on_rerun(tmp_path):
     out = tmp_path / "events.jsonl"
 
@@ -65,12 +76,10 @@ def test_parquet_round_trip_streams_all_batches(tmp_path):
     writer.close()
 
     table = pq.read_table(str(out))
-    df = table.to_pandas()
-    assert len(df) == 2
-    assert set(df["id"].astype(str)) == {"1", "2"}
-
-    payload = json.loads(df.iloc[0]["payload"])
-    assert payload["ref"] == "refs/heads/master"
+    assert table.num_rows == 2
+    by_id = dict(zip(table.column("id").to_pylist(), table.column("payload").to_pylist()))
+    assert set(by_id) == {"1", "2"}
+    assert json.loads(by_id["1"])["ref"] == "refs/heads/master"
 
 
 def test_parquet_handles_heterogeneous_event_types(tmp_path):
@@ -225,11 +234,10 @@ def test_jsonl_to_parquet_round_trip(tmp_path):
     assert rows == 2
 
     table = pq.read_table(str(parquet_path))
-    df = table.to_pandas()
-    assert len(df) == 2
-    assert set(df["id"].astype(str)) == {"1", "2"}
-    payload = json.loads(df.iloc[0]["payload"])
-    assert payload["ref"] == "refs/heads/master"
+    assert table.num_rows == 2
+    by_id = dict(zip(table.column("id").to_pylist(), table.column("payload").to_pylist()))
+    assert set(by_id) == {"1", "2"}
+    assert json.loads(by_id["1"])["ref"] == "refs/heads/master"
 
 
 def test_jsonl_to_parquet_skips_blank_and_malformed_lines(tmp_path):

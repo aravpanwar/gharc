@@ -1,27 +1,48 @@
 # src/gharc/cli.py
 import click
+import logging
 import sys
+from datetime import datetime, timezone
+from . import __version__
 from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
 from .storage import jsonl_to_parquet
 
+
+def _split_csv(raw):
+    """Split a comma-separated option into a clean list, dropping blanks.
+
+    Returns None when nothing usable is left. This keeps a value like
+    "apache/spark,,foo" from leaving an empty token, which would make the
+    byte-level pre-filter match every line and quietly lose the optimization.
+    """
+    if not raw:
+        return None
+    items = [part.strip() for part in raw.split(',') if part.strip()]
+    return items or None
+
+
 @click.group()
-def main():
+@click.version_option(version=__version__, prog_name="gharc")
+@click.option('--debug', is_flag=True, help='Enable verbose debug logging.')
+def main(debug):
     """gharc: Stream-filter GitHub Archive data."""
-    setup_logging()
+    setup_logging(logging.DEBUG if debug else logging.INFO)
 
 @main.command()
-@click.option('--start', required=True, help='Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
-@click.option('--end', required=True, help='End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
-@click.option('--repos', help='Comma-separated repos (e.g. apache/spark)')
+@click.option('--start', required=True, help='Start date in UTC, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
+@click.option('--end', required=True, help='End date in UTC, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
+@click.option('--repos', help='Comma-separated repos; supports owner/* wildcards (e.g. apache/spark, apache/*)')
+@click.option('--orgs', help='Comma-separated repository owners to keep (e.g. apache)')
+@click.option('--actors', help='Comma-separated actor logins to keep (e.g. dongjoon-hyun)')
 @click.option('--event-types', help='Comma-separated events (e.g. PushEvent)')
 @click.option('--output', default='filtered.jsonl', help='Output file')
 @click.option('--workers', default=4, help='Parallel downloads')
-def download(start, end, repos, event_types, output, workers):
+def download(start, end, repos, orgs, actors, event_types, output, workers):
     """Stream GHArchive over a date range and write matching events.
 
-    Filters by repository and event type, writing Parquet or JSONL chosen by
-    the --output suffix. --end is exclusive.
+    Filters by repository, owner, actor, and event type, writing Parquet or
+    JSONL chosen by the --output suffix. --end is exclusive. Dates are UTC.
     """
     try:
         s_dt = parse_date(start)
@@ -31,13 +52,41 @@ def download(start, end, repos, event_types, output, workers):
                 f"--start ({start}) must be before --end ({end}); "
                 f"--end is exclusive."
             )
-        repo_list = [r.strip() for r in repos.split(',')] if repos else None
-        type_list = [t.strip() for t in event_types.split(',')] if event_types else None
-        
-        process_range(s_dt, e_dt, repo_list, type_list, output, workers)
-        
+        if workers < 1:
+            raise ValueError(f"--workers must be at least 1 (got {workers}).")
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if s_dt >= now:
+            raise ValueError(
+                f"--start ({start}) is in the future; GHArchive has no data for "
+                f"that window yet. Dates are UTC."
+            )
+        if e_dt > now:
+            logger.warning(
+                "--end is in the future or very recent; GHArchive publishes each "
+                "hour a little after it ends, so the latest hours may be missing."
+            )
+        repo_list = _split_csv(repos)
+        type_list = _split_csv(event_types)
+        org_list = _split_csv(orgs)
+        actor_list = _split_csv(actors)
+
+        if s_dt < datetime(2015, 1, 1) and (repo_list or org_list):
+            logger.warning(
+                "Window starts before 2015-01-01, where GHArchive uses the older "
+                "Timeline schema without repo.name; repository and owner filters "
+                "may match nothing for those hours."
+            )
+
+        process_range(s_dt, e_dt, repo_list, type_list, output, workers,
+                      orgs=org_list, actors=actor_list)
+
+    except KeyboardInterrupt:
+        # process_range has already cleaned up and logged; exit with the
+        # conventional SIGINT status.
+        sys.exit(130)
     except Exception as e:
         logger.error(str(e))
+        logger.debug("Full traceback:", exc_info=True)
         sys.exit(1)
 
 
@@ -56,6 +105,7 @@ def convert(input_path, output_path, batch_size):
         jsonl_to_parquet(input_path, output_path, batch_size=batch_size)
     except Exception as e:
         logger.error(str(e))
+        logger.debug("Full traceback:", exc_info=True)
         sys.exit(1)
 
 

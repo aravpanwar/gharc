@@ -11,8 +11,20 @@ requires-python = ">=3.10"
 authors = [
   { name = "Arav Panwar", email = "aravpanwar@outlook.com" },
 ]
+license = { text = "MIT" }
+keywords = [
+    "github",
+    "gharchive",
+    "mining-software-repositories",
+    "msr",
+    "stream-processing",
+    "parquet",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Information Analysis",
@@ -20,7 +32,6 @@ classifiers = [
 dependencies = [
     "requests>=2.28.0",
     "click>=8.0.0",
-    "pandas>=2.0.0",
     "pyarrow>=12.0.0",  # For Parquet support
     "tqdm>=4.65.0",     # For progress bars
 ]

@@ -1,7 +1,6 @@
 # src/gharc/storage.py
 import json
 import os
-import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from .utils import logger
@@ -29,8 +28,6 @@ EVENT_TOP_LEVEL = [
     "org",
 ]
 
-EVENT_COLUMNS = EVENT_TOP_LEVEL + ["other"]
-
 EVENT_SCHEMA = pa.schema([
     pa.field("id", pa.string()),
     pa.field("type", pa.string()),
@@ -47,17 +44,12 @@ EVENT_SCHEMA = pa.schema([
 def _events_to_table(events: list) -> pa.Table:
     """Turn a batch of events into a Parquet-ready table with a stable schema.
 
-    Nested fields are JSON-stringified, any of the canonical columns missing
-    from this batch are added as nulls, and the result is coerced to
-    ``EVENT_SCHEMA`` so every batch written to a file looks identical.
+    Nested fields are JSON-stringified in ``_flatten_event``, and building the
+    table against ``EVENT_SCHEMA`` fills any canonical column missing from this
+    batch with nulls, so every batch written to a file looks identical.
     """
     rows = [_flatten_event(e) for e in events]
-    df = pd.DataFrame(rows)
-    for col in EVENT_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
-    df = df[EVENT_COLUMNS]
-    return pa.Table.from_pandas(df, schema=EVENT_SCHEMA, preserve_index=False)
+    return pa.Table.from_pylist(rows, schema=EVENT_SCHEMA)
 
 
 class DataWriter:
@@ -122,7 +114,10 @@ class DataWriter:
         else:
             with open(self.filename, 'a', encoding='utf-8') as f:
                 for rec in self.buffer:
-                    f.write(json.dumps(rec) + '\n')
+                    # ensure_ascii=False keeps non-English text readable and
+                    # smaller, and matches how nested fields are stored for
+                    # Parquet in _flatten_event.
+                    f.write(json.dumps(rec, ensure_ascii=False) + '\n')
 
         self.buffer = []
 
