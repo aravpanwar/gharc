@@ -30,8 +30,8 @@ def main(debug):
     setup_logging(logging.DEBUG if debug else logging.INFO)
 
 @main.command()
-@click.option('--start', required=True, help='Start date, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
-@click.option('--end', required=True, help='End date, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
+@click.option('--start', required=True, help='Start date in UTC, inclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
+@click.option('--end', required=True, help='End date in UTC, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
 @click.option('--repos', help='Comma-separated repos; supports owner/* wildcards (e.g. apache/spark, apache/*)')
 @click.option('--orgs', help='Comma-separated repository owners to keep (e.g. apache)')
 @click.option('--actors', help='Comma-separated actor logins to keep (e.g. dongjoon-hyun)')
