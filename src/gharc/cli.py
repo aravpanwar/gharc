@@ -5,6 +5,20 @@ from .utils import parse_date, logger, setup_logging
 from .streamer import process_range
 from .storage import jsonl_to_parquet
 
+
+def _split_csv(raw):
+    """Split a comma-separated option into a clean list, dropping blanks.
+
+    Returns None when nothing usable is left. This keeps a value like
+    "apache/spark,,foo" from leaving an empty token, which would make the
+    byte-level pre-filter match every line and quietly lose the optimization.
+    """
+    if not raw:
+        return None
+    items = [part.strip() for part in raw.split(',') if part.strip()]
+    return items or None
+
+
 @click.group()
 def main():
     """gharc: Stream-filter GitHub Archive data."""
@@ -31,9 +45,11 @@ def download(start, end, repos, event_types, output, workers):
                 f"--start ({start}) must be before --end ({end}); "
                 f"--end is exclusive."
             )
-        repo_list = [r.strip() for r in repos.split(',')] if repos else None
-        type_list = [t.strip() for t in event_types.split(',')] if event_types else None
-        
+        if workers < 1:
+            raise ValueError(f"--workers must be at least 1 (got {workers}).")
+        repo_list = _split_csv(repos)
+        type_list = _split_csv(event_types)
+
         process_range(s_dt, e_dt, repo_list, type_list, output, workers)
         
     except Exception as e:
