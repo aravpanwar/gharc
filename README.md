@@ -181,6 +181,8 @@ gharc.process_range(
 gharc.jsonl_to_parquet("spark_one_day.jsonl", "spark_one_day.parquet")
 ```
 
+`process_range` also accepts `orgs` and `actors` keyword arguments mirroring the `--orgs` and `--actors` CLI flags, and entries in `repos` may use `owner/*` wildcards, so `repos=["apache/*"]` keeps every repository under an owner.
+
 `__all__` in `gharc/__init__.py` lists the public surface (`process_range`, `jsonl_to_parquet`, `DataWriter`, `parse_date`, `date_range`, `get_url_for_time`, `setup_logging`, plus the filter helpers).
 
 ---
