@@ -37,7 +37,7 @@ Cloud-warehouse mirrors of GHArchive on BigQuery and Snowflake [@githubarchivebi
 
 # Software design
 
-`gharc` is built around one decision: decouple peak local storage from the time range by treating each hour as transient. The user supplies a date range and optional repository and event-type filters; `gharc` builds the GHArchive URL for each hour and dispatches the hours to a worker pool. Each worker downloads an hour, filters it line by line, and returns the matches; the main thread writes them out and the temporary file is removed (\autoref{fig:arch}).
+`gharc` is built around one decision: decouple peak local storage from the time range by treating each hour as transient. The user supplies a date range and optional filters on repository (an exact name or an `owner/*` wildcard), owner, actor, and event type; `gharc` builds the GHArchive URL for each hour and dispatches the hours to a worker pool. Each worker downloads an hour, filters it line by line, and returns the matches; the main thread writes them out and the temporary file is removed (\autoref{fig:arch}).
 
 The central trade-off follows from that decision. Streaming and filtering re-pays download bandwidth on every run, because nothing is cached locally for reuse, and it deliberately offers no cross-time query capability. In exchange, peak disk stays bounded and the tool needs no database, warehouse, or persistent local dataset. For the target setting, repeated reads of the same window are rare and disk is the binding constraint, so the design favors bounded storage over reuse, and leaves aggregation and joins to whatever the researcher already uses (pandas, Polars, DuckDB, Spark) over the small filtered output.
 
