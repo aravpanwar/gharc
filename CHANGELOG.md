@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- README claims are scoped to what has been measured. The intro describes
+  the stream-and-filter route and its intended users instead of a marketing
+  pitch, the bounded-disk bullet no longer implies terabyte-scale runs have
+  been performed, and the unmeasured Parquet size comparison is gone.
+
 ## [0.1.4] - 2026-06-28
 
 ### Added
