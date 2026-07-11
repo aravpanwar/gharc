@@ -7,7 +7,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![DOI](https://zenodo.org/badge/1112791047.svg)](https://doi.org/10.5281/zenodo.19814232)
 
-**Mine the GitHub Archive on a standard laptop.**
+**Pull filtered slices of the GitHub Archive on a laptop, without holding raw hours on disk.**
 
 `gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset on consumer hardware. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by the downloads in flight at once, one temporary file per worker (each hourly archive is roughly 60 to 150 MB in 2024), so disk use scales with `--workers` rather than with how long a window you process.
 
@@ -15,18 +15,15 @@
 
 ## Why gharc?
 
-The full GitHub Archive spans every public event since 2011: tens of terabytes compressed, and several petabytes uncompressed. Traditional analysis requires either massive local storage or a cloud-warehouse account (BigQuery, Snowflake).
+The full GitHub Archive spans every public event since 2011: tens of terabytes compressed, and several petabytes uncompressed. Most studies need only a small slice of it, but the archive has no server-side filtering, so the usual options are downloading whole hours to local disk or querying a cloud-warehouse mirror (BigQuery, Snowflake).
 
-`gharc` solves this by implementing a **Stream-and-Filter** architecture:
+`gharc` takes a third route and filters during the download:
 1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
-2.  **Filtering:** Extracts only events matching your criteria (e.g., specific repos or event types).
-3.  **Writing:** Streams matching events into a single **Parquet** or **JSONL** file via `pyarrow.ParquetWriter` for true append.
-4.  **Cleanup:** Deletes the temporary download immediately after, so disk usage never accumulates.
+2.  **Filtering:** Keeps only the events matching your filters (repositories, owners, actors, event types).
+3.  **Writing:** Appends the matches to a single **Parquet** or **JSONL** output via `pyarrow.ParquetWriter`.
+4.  **Cleanup:** Deletes the temporary download before moving to the next hour, so disk usage never accumulates.
 
-**Ideal for:**
-- Academic research on Open Source Software (OSS).
-- Large scale data mining on consumer hardware.
-- Creating custom datasets for specific organizations or ecosystems.
+It is meant for researchers and students who need event-level GitHub data over long windows but do not have a warehouse account or the disk to hold raw months.
 
 ![Architecture: GHArchive HTTPS to thread pool to resumable download to temp file to streaming decode and filter to DataWriter to output file.](paper/figures/architecture.png)
 
@@ -34,12 +31,12 @@ The full GitHub Archive spans every public event since 2011: tens of terabytes c
 
 ## Key Features
 
-* **Bounded Storage:** Processes terabytes of source data while keeping only the in-flight downloads on disk, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker). For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
-* **Resumable Downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
+* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
+* **Resumable downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
 * **Parallel processing:** Hours in the range are downloaded and filtered across a thread pool.
-* **Filtering before parsing:** A byte-level token check rejects irrelevant lines before any JSON parsing, so most events are skipped without paying the parser cost.
+* **Filtering before parsing:** A byte-level token check rejects lines that cannot match before any JSON parsing. With a selective filter most lines never reach the parser; a wide or empty filter gains nothing from this.
 * **Optional orjson:** Uses `orjson` for JSON parsing when it is installed, which is faster than the standard library parser.
-* **Parquet output:** Writes columnar data ready for Pandas, Spark, or Polars, typically several times smaller than the equivalent JSONL.
+* **Parquet output:** Writes columnar data that loads directly into pandas, Polars, or Spark. JSONL output is available for resumable runs and line-oriented tools.
 
 ---
 
@@ -85,9 +82,9 @@ source venv/bin/activate
 pip install -e .
 ```
 
-### Optional Performance Boost
+### Optional: faster JSON parsing
 
-For maximum speed, install with the `fast` extra. `gharc` detects and uses `orjson` automatically when available.
+`gharc` uses `orjson` instead of the standard library parser when it is installed. The `fast` extra pulls it in:
 
 ```bash
 pip install "gharc[fast]"
