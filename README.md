@@ -55,6 +55,8 @@ Both runs recovered the same events, so concurrency does not affect output. Peak
 
 Across the same six-hour window gharc streams about 416 MB of compressed source from GHArchive (six hourly files of roughly 60 to 85 MB each) but never retains it. The full source is still transferred, so this is not a bandwidth saving; what stays bounded is local disk. Peak disk is held to the temporary files in flight, one per worker: about 85 MB with a single worker and about 250 MB at the default four workers. The filtered Parquet output for `apache/spark` over that window is 53 KB, and local disk does not grow with the length of the window processed.
 
+At full scale: a six-month window (January to June 2024, 4,368 hourly files, roughly 350 GB of compressed source) filtered to `apache/spark` completed in 11 h 16 min on the same laptop over a residential connection, with peak temporary disk of 565 MB and a 112 MB Parquet output. Peak in-flight disk runs higher than the six-hour benchmark suggests because hourly file sizes vary widely by time of day. The full reproduction, including a comparison against the study it reproduces, is at [Spark_Codebase_Evolution](https://github.com/aravpanwar/Spark_Codebase_Evolution/tree/main/redo).
+
 ---
 
 ## Installation

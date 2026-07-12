@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- The README performance section records a full-scale validation: a
+  six-month window (4,368 hourly files, roughly 350 GB of source) filtered
+  to one repository in 11 h 16 min with 565 MB peak temporary disk, linked
+  to the public reproduction of the study that motivated the tool.
+
 ### Changed
 - README claims are scoped to what has been measured. The intro describes
   the stream-and-filter route and its intended users instead of a marketing
