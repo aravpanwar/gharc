@@ -48,12 +48,12 @@ A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apa
 
 | Workers | Wall-clock | Hours/sec | Spark events | Peak RSS |
 |---|---|---|---|---|
-| 1 | 76.0 s | 0.079 | 14 | 94.2 MB |
-| 4 | 58.1 s | 0.103 | 14 | 106.7 MB |
+| 1 | 45.6 s | 0.132 | 14 | 98.7 MB |
+| 4 | 21.1 s | 0.285 | 14 | 112.6 MB |
 
-Both runs recovered the same events, so concurrency does not affect output. Peak RSS stays below 110 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection.
+Both runs recovered the same events, so concurrency does not affect output. Peak RSS stays below 115 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection.
 
-Across the same six-hour window gharc streams about 416 MB of compressed source from GHArchive (six hourly files of roughly 60 to 85 MB each) but never retains it. The full source is still transferred, so this is not a bandwidth saving; what stays bounded is local disk. Peak disk is held to the temporary files in flight, one per worker: about 85 MB with a single worker and about 250 MB at the default four workers. The filtered Parquet output for `apache/spark` over that window is 53 KB, and local disk does not grow with the length of the window processed.
+Across the same six-hour window gharc streams about 416 MB of compressed source from GHArchive (six hourly files of roughly 60 to 85 MB each) but never retains it. The full source is still transferred, so this is not a bandwidth saving; what stays bounded is local disk. Peak disk is held to the temporary files in flight, one per worker: about 85 MB with a single worker and about 290 MB at the default four workers. The filtered Parquet output for `apache/spark` over that window is 62 KB, and local disk does not grow with the length of the window processed.
 
 At full scale: a six-month window (January to June 2024, 4,368 hourly files, roughly 350 GB of compressed source) filtered to `apache/spark` completed in 11 h 16 min on the same laptop over a residential connection, with peak temporary disk of 565 MB and a 112 MB Parquet output. Peak in-flight disk runs higher than the six-hour benchmark suggests because hourly file sizes vary widely by time of day. The full reproduction, including a comparison against the study it reproduces, is at [Spark_Codebase_Evolution](https://github.com/aravpanwar/Spark_Codebase_Evolution/tree/main/redo).
 
