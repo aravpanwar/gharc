@@ -1,5 +1,5 @@
 ---
-title: 'gharc: A stream-and-filter tool for the GitHub Archive on consumer hardware'
+title: 'gharc: A stream-and-filter tool for the GitHub Archive on commodity hardware'
 tags:
   - Python
   - GitHub
