@@ -63,7 +63,7 @@ More broadly, the tool lowers the entry cost for event-level GitHub research to 
 
 # AI usage disclosure
 
-The author directed the project throughout: framing the problem, setting the requirements, making the software design decisions, and reviewing, testing, and validating all output. Generative AI assistance (Claude Opus 4.8, Anthropic) was used during implementation, test development, documentation, and the drafting of this paper. Correctness was verified by the author through the automated test suite and live runs against GHArchive that confirmed event counts, output integrity, and the reported benchmarks. The author takes full responsibility for the software and the contents of this paper.
+The author wrote the implementation, the documentation, and this paper, and made all software design decisions. Generative AI assistance (Claude Opus 4.8, Anthropic) was used to write the automated test suite, to fix and harden bugs identified during development and review, and to edit and polish the prose of the documentation and this paper. Correctness was verified by the author through the automated test suite and live runs against GHArchive that confirmed event counts, output integrity, and the reported benchmarks. The author takes full responsibility for the software and the contents of this paper.
 
 # Software availability
 
