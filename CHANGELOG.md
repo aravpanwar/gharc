@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-25
+
 ### Added
 - The README performance section records a full-scale validation: a
   six-month window (4,368 hourly files, roughly 350 GB of source) filtered
@@ -146,6 +148,7 @@ follows [Semantic Versioning](https://semver.org/).
 - JOSS-style paper draft under `paper/`.
 - MIT license, CITATION.cff, Zenodo deposit.
 
+[0.1.5]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.5
 [0.1.4]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.4
 [0.1.3]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.3
 [0.1.2]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.2
