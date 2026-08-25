@@ -9,7 +9,7 @@
 
 **Pull filtered slices of the GitHub Archive on a laptop, without holding raw hours on disk.**
 
-`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset on consumer hardware. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by the downloads in flight at once, one temporary file per worker (each hourly archive is roughly 60 to 150 MB in 2024), so disk use scales with `--workers` rather than with how long a window you process.
+`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset on commodity hardware. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by the downloads in flight at once, one temporary file per worker (each hourly archive is roughly 60 to 150 MB in 2024), so disk use scales with `--workers` rather than with how long a window you process.
 
 ---
 
@@ -237,7 +237,7 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
 ```bibtex
 @software{gharc2026,
   author = {Panwar, Arav},
-  title = {gharc: A stream-and-filter tool for the GitHub Archive on consumer hardware},
+  title = {gharc: A stream-and-filter tool for the GitHub Archive on commodity hardware},
   year = {2026},
   url = {https://github.com/aravpanwar/gharc}
 }

@@ -1,9 +1,9 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
-title: "gharc: A stream-and-filter tool for the GitHub Archive on consumer hardware"
+title: "gharc: A stream-and-filter tool for the GitHub Archive on commodity hardware"
 abstract: >-
-  gharc filters the GitHub Archive on consumer hardware by streaming
+  gharc filters the GitHub Archive on commodity hardware by streaming
   each hourly archive through memory and writing only matching events
   to Parquet or JSONL. Peak local storage stays bounded by the downloads
   in flight at once, one temporary file per worker, rather than by the
