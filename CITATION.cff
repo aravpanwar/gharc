@@ -12,8 +12,8 @@ authors:
   - family-names: Panwar
     given-names: Arav
     orcid: https://orcid.org/0009-0009-3013-5970
-version: 0.1.4
-date-released: 2026-07-05
+version: 0.1.5
+date-released: 2026-08-25
 license: MIT
 repository-code: https://github.com/aravpanwar/gharc
 doi: 10.5281/zenodo.19814232
@@ -36,6 +36,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.21204553
     description: DOI for v0.1.4
+  - type: doi
+    value: 10.5281/zenodo.22091185
+    description: DOI for v0.1.5
 keywords:
   - github
   - mining-software-repositories
