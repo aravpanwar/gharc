@@ -52,12 +52,24 @@ DOWNLOAD_MISSING = "missing"
 DOWNLOAD_RETRY = "retry"
 
 
-def download_resumable(url: str, temp_path: str, session: requests.Session) -> str:
+class _HourStopped(RuntimeError):
+    """Raised inside a worker when the run asked in-flight hours to give up."""
+
+
+def _raise_if_stopped(stop, url):
+    if stop is not None and stop.is_set():
+        raise _HourStopped(f"stopped before {url} finished")
+
+
+def download_resumable(url: str, temp_path: str, session: requests.Session,
+                       stop: threading.Event = None) -> str:
     """Download a file with resume capability.
 
     Returns ``DOWNLOAD_OK`` once the file is in place, ``DOWNLOAD_MISSING`` if
     the server says the archive does not exist (HTTP 404 or 410), or
-    ``DOWNLOAD_RETRY`` for a transient failure the caller should retry.
+    ``DOWNLOAD_RETRY`` for a transient failure the caller should retry. If
+    ``stop`` is set mid-transfer the download is abandoned and reported as
+    ``DOWNLOAD_RETRY``; the caller checks ``stop`` before retrying.
     """
     resume_header = {}
     mode = 'wb'
@@ -86,6 +98,8 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> s
 
             with open(temp_path, mode) as f:
                 for chunk in r.iter_content(chunk_size=65536):
+                    if stop is not None and stop.is_set():
+                        return DOWNLOAD_RETRY
                     if chunk:
                         f.write(chunk)
         return DOWNLOAD_OK
@@ -94,12 +108,14 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> s
         return DOWNLOAD_RETRY
 
 def process_single_hour(dt: datetime, repos: list, event_types: list,
-                        orgs: list = None, actors: list = None):
+                        orgs: list = None, actors: list = None,
+                        stop: threading.Event = None):
     """Download one hour, keep matching events, delete the temp file.
 
     Returns the list of events matching the filters (possibly empty), or None if
     GHArchive has no archive for that hour (a known gap), so the caller can tell
-    an absent hour apart from an hour that simply had no matches.
+    an absent hour apart from an hour that simply had no matches. Setting
+    ``stop`` from another thread makes the hour give up promptly by raising.
     """
     url = get_url_for_time(dt)
     results = []
@@ -118,13 +134,15 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
 
     try:
         for attempt in range(10):
-            status = download_resumable(url, temp_path, session)
+            _raise_if_stopped(stop, url)
+            status = download_resumable(url, temp_path, session, stop)
             if status == DOWNLOAD_OK:
                 download_success = True
                 break
             if status == DOWNLOAD_MISSING:
                 logger.debug(f"No archive available at {url}")
                 return None
+            _raise_if_stopped(stop, url)
             time.sleep(2)
 
         if not download_success:
@@ -139,6 +157,7 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
         try:
             with gzip.open(temp_path, 'rb') as f:
                 for line in f:
+                    _raise_if_stopped(stop, url)
                     try:
                         if HAS_ORJSON:
                             if not passes_prefilter(line, groups):
@@ -155,6 +174,8 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                     except Exception:
                         # GHArchive occasionally has malformed lines; expected at low rates.
                         continue
+        except _HourStopped:
+            raise
         except Exception as e:
             # A gzip-level error means the download is truncated or corrupt, so
             # the events collected so far are an incomplete view of the hour.
@@ -352,9 +373,17 @@ def process_range(start, end, repos, event_types, output, workers,
     # `with` block's exit calls shutdown(wait=True), which drains the whole
     # queue instead. On a long run that means Ctrl+C would keep downloading
     # for a long time before stopping.
+    #
+    # Cancelling only covers hours still queued. The hours already running are
+    # told to give up through `stop`, because otherwise the final
+    # shutdown(wait=True) would sit until each in-flight download and parse
+    # finished on its own.
+    stop = threading.Event()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
     future_to_time = {
-        executor.submit(process_single_hour, ts, repos, event_types, orgs, actors): ts
+        executor.submit(
+            process_single_hour, ts, repos, event_types, orgs, actors, stop=stop
+        ): ts
         for ts in todo
     }
 
@@ -397,6 +426,7 @@ def process_range(start, end, repos, event_types, output, workers,
         # the pool. Any rows buffered for an hour that was not marked done are
         # dropped. KeyboardInterrupt is re-raised so an API caller sees the
         # normal interrupt; the CLI turns it into a non-zero exit.
+        stop.set()
         executor.shutdown(wait=False, cancel_futures=True)
         writer.buffer.clear()
         writer.close()
