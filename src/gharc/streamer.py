@@ -12,10 +12,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from tqdm import tqdm
 from .utils import get_url_for_time, date_range, logger
-from .filters import passes_filters, fast_string_check, prefilter_tokens
+from .filters import passes_filters, passes_prefilter, prefilter_groups
 from .storage import DataWriter
 
-# Use orjson if available for 3-5x faster parsing
 try:
     import orjson
     HAS_ORJSON = True
@@ -104,12 +103,11 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
     """
     url = get_url_for_time(dt)
     results = []
-    tokens = prefilter_tokens(repos, event_types, orgs, actors)
-    # Convert filters to bytes if using orjson for speed.
+    groups = prefilter_groups(repos, event_types, orgs, actors)
+    # orjson parses bytes directly, so matching the tokens as bytes lets a
+    # rejected line skip UTF-8 decoding as well as parsing.
     if HAS_ORJSON:
-        fast_tokens = [t.encode('utf-8') for t in tokens]
-    else:
-        fast_tokens = tokens
+        groups = [[t.encode('utf-8') for t in tokens] for tokens in groups]
 
     session = _session_for_thread()
 
@@ -142,18 +140,13 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
             with gzip.open(temp_path, 'rb') as f:
                 for line in f:
                     try:
-                        # OPTIMIZATION: Check tokens before full parse
-                        # orjson returns bytes, so we don't even need to decode to utf-8 yet
                         if HAS_ORJSON:
-                            if fast_tokens:
-                                # Simple byte-level check (very fast)
-                                if not any(t in line for t in fast_tokens):
-                                    continue
+                            if not passes_prefilter(line, groups):
+                                continue
                             event = orjson.loads(line)
                         else:
-                            # Standard Fallback
                             decoded = line.decode('utf-8')
-                            if fast_tokens and not fast_string_check(decoded, fast_tokens):
+                            if not passes_prefilter(decoded, groups):
                                 continue
                             event = json.loads(decoded)
 

@@ -1,5 +1,10 @@
 import pytest
-from gharc.filters import passes_filters, fast_string_check, prefilter_tokens
+from gharc.filters import (
+    passes_filters,
+    fast_string_check,
+    prefilter_groups,
+    passes_prefilter,
+)
 
 def test_fast_string_check():
     # Should return True if ANY token is present
@@ -74,15 +79,42 @@ def test_passes_filters_groups_are_anded():
     assert passes_filters(event, repos=["apache/spark"], event_types=["WatchEvent"]) is False
 
 
-def test_prefilter_tokens_cover_each_group():
-    tokens = prefilter_tokens(
+def test_prefilter_groups_cover_each_group():
+    groups = prefilter_groups(
         repos=["apache/spark", "apache/*"],
         event_types=["PushEvent"],
         orgs=["pandas-dev"],
         actors=["bob"],
     )
-    assert tokens == ["apache/spark", "apache/", "pandas-dev/", "PushEvent", "bob"]
+    # Repos and orgs share a group because they are combined with OR.
+    assert groups == [
+        ["apache/spark", "apache/", "pandas-dev/"],
+        ["PushEvent"],
+        ["bob"],
+    ]
 
 
-def test_prefilter_tokens_empty_without_filters():
-    assert prefilter_tokens() == []
+def test_prefilter_groups_empty_without_filters():
+    assert prefilter_groups() == []
+
+
+def test_passes_prefilter_requires_every_group():
+    groups = prefilter_groups(repos=["apache/spark"], event_types=["PushEvent"])
+    spark_push = '{"type": "PushEvent", "repo": {"name": "apache/spark"}}'
+    other_push = '{"type": "PushEvent", "repo": {"name": "someone/else"}}'
+    spark_watch = '{"type": "WatchEvent", "repo": {"name": "apache/spark"}}'
+
+    assert passes_prefilter(spark_push, groups) is True
+    # A token from one group alone is not enough to reach the parser.
+    assert passes_prefilter(other_push, groups) is False
+    assert passes_prefilter(spark_watch, groups) is False
+
+
+def test_passes_prefilter_admits_everything_without_groups():
+    assert passes_prefilter('{"anything": 1}', []) is True
+
+
+def test_passes_prefilter_works_on_bytes():
+    groups = [[b"apache/"], [b"PushEvent"]]
+    assert passes_prefilter(b'{"type":"PushEvent","repo":{"name":"apache/x"}}', groups)
+    assert not passes_prefilter(b'{"type":"PushEvent","repo":{"name":"other/x"}}', groups)

@@ -32,6 +32,30 @@ def test_process_single_hour_success():
     assert results[0]['repo']['name'] == "apache/spark"
 
 
+@pytest.mark.parametrize("use_orjson", [False, True])
+def test_process_single_hour_combined_filter_on_both_parsers(use_orjson):
+    if use_orjson:
+        pytest.importorskip("orjson")
+    lines = [
+        b'{"type": "PushEvent", "repo": {"name": "someone/else"}}',
+        b'{"type": "WatchEvent", "repo": {"name": "apache/spark"}}',
+        b'{"type": "PushEvent", "repo": {"name": "apache/spark"}}',
+        b'not json at all',
+    ]
+    with patch('gharc.streamer.HAS_ORJSON', use_orjson), \
+            patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_OK), \
+            patch('gzip.open') as mock_gzip:
+        mock_file = MagicMock()
+        mock_file.__iter__.return_value = lines
+        mock_gzip.return_value.__enter__.return_value = mock_file
+
+        results = process_single_hour(
+            datetime(2024, 1, 1, 10), repos=["apache/spark"], event_types=["PushEvent"]
+        )
+
+    assert results == [{"type": "PushEvent", "repo": {"name": "apache/spark"}}]
+
+
 @patch('gharc.streamer.time.sleep', lambda *_: None)
 @patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_RETRY)
 def test_process_single_hour_raises_on_persistent_download_failure(_mock):
