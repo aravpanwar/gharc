@@ -75,6 +75,9 @@ DOWNLOAD_OK = "ok"
 DOWNLOAD_MISSING = "missing"
 DOWNLOAD_RETRY = "retry"
 
+# How many times one hour's download is attempted before the hour fails.
+DOWNLOAD_ATTEMPTS = 10
+
 
 class _HourStopped(RuntimeError):
     """Raised inside a worker when the run asked in-flight hours to give up."""
@@ -203,6 +206,40 @@ def download_resumable(url: str, temp_path: str, session: requests.Session,
         logger.debug(f"Download attempt failed for {url}: {e}")
         return DOWNLOAD_RETRY
 
+def _sweep_archive(path, url, groups, repos, event_types, orgs, actors, stop):
+    """Read one downloaded hour and return the events that pass the filters."""
+    results = []
+    try:
+        with gzip.open(path, 'rb') as f:
+            for line in f:
+                _raise_if_stopped(stop, url)
+                try:
+                    if HAS_ORJSON:
+                        if not passes_prefilter(line, groups):
+                            continue
+                        event = orjson.loads(line)
+                    else:
+                        decoded = line.decode('utf-8')
+                        if not passes_prefilter(decoded, groups):
+                            continue
+                        event = json.loads(decoded)
+
+                    if passes_filters(event, repos, event_types, orgs, actors):
+                        results.append(event)
+                except Exception:
+                    # GHArchive occasionally has malformed lines; expected at low rates.
+                    continue
+    except _HourStopped:
+        raise
+    except Exception as e:
+        # A gzip-level error means the download is truncated or corrupt, so
+        # the events collected so far are an incomplete view of the hour.
+        # Raise rather than return a partial result, so the hour is retried
+        # on resume instead of being recorded as complete.
+        raise RuntimeError(f"couldn't read archive {url}: {e}") from e
+    return results
+
+
 def process_single_hour(dt: datetime, repos: list, event_types: list,
                         orgs: list = None, actors: list = None,
                         stop: threading.Event = None):
@@ -216,7 +253,6 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
     read that is blocked on a stalled connection.
     """
     url = get_url_for_time(dt)
-    results = []
     groups = prefilter_groups(repos, event_types, orgs, actors)
     # orjson parses bytes directly, so matching the tokens as bytes lets a
     # rejected line skip UTF-8 decoding as well as parsing.
@@ -224,21 +260,17 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
         groups = [[t.encode('utf-8') for t in tokens] for tokens in groups]
 
     session = _session_for_thread()
-
     fd, temp_path = tempfile.mkstemp(suffix=".json.gz")
     os.close(fd)
-    
-    download_success = False
     # The retry policy's backoff sleep runs deep inside requests, so it finds
     # this hour's stop signal through the worker thread instead.
     _thread_local.stop = stop
 
     try:
-        for attempt in range(10):
+        for _ in range(DOWNLOAD_ATTEMPTS):
             _raise_if_stopped(stop, url)
             status = download_resumable(url, temp_path, session, stop)
             if status == DOWNLOAD_OK:
-                download_success = True
                 break
             if status == DOWNLOAD_MISSING:
                 logger.debug(f"No archive available at {url}")
@@ -248,51 +280,22 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                 stop.wait(2)
             else:
                 time.sleep(2)
-
-        if not download_success:
+        else:
             # A persistent download failure is a real failure, not an empty
             # hour. Raise so the run reports it and (for JSONL output) retries
             # this hour on resume, rather than silently dropping it.
             raise RuntimeError(
-                f"failed to download {url} after 10 attempts "
+                f"failed to download {url} after {DOWNLOAD_ATTEMPTS} attempts "
                 f"(run with --debug for details)"
             )
 
-        try:
-            with gzip.open(temp_path, 'rb') as f:
-                for line in f:
-                    _raise_if_stopped(stop, url)
-                    try:
-                        if HAS_ORJSON:
-                            if not passes_prefilter(line, groups):
-                                continue
-                            event = orjson.loads(line)
-                        else:
-                            decoded = line.decode('utf-8')
-                            if not passes_prefilter(decoded, groups):
-                                continue
-                            event = json.loads(decoded)
-
-                        if passes_filters(event, repos, event_types, orgs, actors):
-                            results.append(event)
-                    except Exception:
-                        # GHArchive occasionally has malformed lines; expected at low rates.
-                        continue
-        except _HourStopped:
-            raise
-        except Exception as e:
-            # A gzip-level error means the download is truncated or corrupt, so
-            # the events collected so far are an incomplete view of the hour.
-            # Raise rather than return a partial result, so the hour is retried
-            # on resume instead of being recorded as complete.
-            raise RuntimeError(f"couldn't read archive {url}: {e}") from e
-
-        return results
-
+        return _sweep_archive(temp_path, url, groups, repos, event_types,
+                              orgs, actors, stop)
     finally:
         _thread_local.stop = None
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 class _RunMarker:
     """Tracks which hours have been completed so a crashed run can resume.
