@@ -11,7 +11,7 @@ from gharc.streamer import (
     process_range,
     download_resumable,
     _HourStopped,
-    _RunState,
+    _RunMarker,
     _run_fingerprint,
     DOWNLOAD_OK,
     DOWNLOAD_MISSING,
@@ -98,8 +98,8 @@ def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
         datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 3),
         ["apache/spark"], None, None, None,
     )
-    seed = _RunState(str(out), fingerprint)
-    seed.mark_done(datetime(2024, 1, 1, 0))
+    earlier = _RunMarker(str(out), fingerprint)
+    earlier.mark_done(datetime(2024, 1, 1, 0))
 
     # The remaining hours raise KeyboardInterrupt as if the user hit Ctrl+C.
     # process_range re-raises it (the CLI turns that into a non-zero exit) and
@@ -132,8 +132,8 @@ def test_resume_trims_uncommitted_tail(tmp_path):
     fingerprint = _run_fingerprint(
         datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2), None, None, None, None
     )
-    state = _RunState(str(out), fingerprint)
-    state.mark_done(datetime(2024, 1, 1, 0), len(committed.encode("utf-8")))
+    marker = _RunMarker(str(out), fingerprint)
+    marker.mark_done(datetime(2024, 1, 1, 0), len(committed.encode("utf-8")))
 
     def fake_hour(dt, repos, event_types, orgs=None, actors=None, stop=None):
         return [{"id": "hour1"}]
@@ -155,9 +155,9 @@ def test_resume_errors_when_output_shorter_than_checkpoint(tmp_path):
     fingerprint = _run_fingerprint(
         datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2), None, None, None, None
     )
-    state = _RunState(str(out), fingerprint)
+    marker = _RunMarker(str(out), fingerprint)
     # Checkpoint claims committed bytes, but the output file is gone.
-    state.mark_done(datetime(2024, 1, 1, 0), 500)
+    marker.mark_done(datetime(2024, 1, 1, 0), 500)
 
     def fake_hour(dt, repos, event_types, orgs=None, actors=None, stop=None):
         return []
