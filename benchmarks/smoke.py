@@ -4,7 +4,6 @@ Verifies the end-to-end pipeline on real data: download, gzip read, filter,
 ParquetWriter, schema stability across event types.
 """
 import json
-import os
 import sys
 import time
 from collections import Counter

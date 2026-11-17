@@ -5,7 +5,6 @@ captures wall-clock time, peak RSS, output size, and event count. Writes a
 single JSON result that the README performance section is drawn from.
 """
 import json
-import os
 import threading
 import time
 from datetime import datetime
