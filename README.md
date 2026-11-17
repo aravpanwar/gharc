@@ -221,7 +221,7 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 **Running Tests:**
 
 ```bash
-pip install -e ".[test]"
+pip install -e ".[test,fast]"
 pytest tests/
 ```
 
