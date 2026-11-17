@@ -30,7 +30,9 @@ def parse_date(date_str: str) -> datetime:
         else:
             return datetime.strptime(date_str, "%Y-%m-%d-%H")
     except ValueError:
-        raise ValueError(f"Invalid date format: {date_str}. Use YYYY-MM-DD or YYYY-MM-DD-HH")
+        raise ValueError(
+            f"expected a date as YYYY-MM-DD or YYYY-MM-DD-HH, got {date_str!r}"
+        ) from None
 
 def date_range(start: datetime, end: datetime) -> Iterator[datetime]:
     """Yields hourly datetimes in [start, end). End is exclusive.

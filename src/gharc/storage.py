@@ -83,8 +83,8 @@ class DataWriter:
 
         if append and self.is_parquet and os.path.exists(self.filename):
             raise ValueError(
-                f"Cannot resume into existing Parquet file {filename}. "
-                f"Use JSONL output for resumable runs and convert at the end."
+                f"refusing to resume into existing Parquet file {filename}; "
+                f"use JSONL output for resumable runs and convert at the end"
             )
 
         if not append and os.path.exists(self.filename):

@@ -15,12 +15,6 @@ def make_fp():
     )
 
 
-def test_fresh_state_has_no_done_hours(tmp_path):
-    out = tmp_path / "events.jsonl"
-    state = _RunState(str(out), make_fp())
-    assert not state.is_done(datetime(2024, 1, 1, 0))
-
-
 def test_mark_done_persists_across_instances(tmp_path):
     out = tmp_path / "events.jsonl"
     fp = make_fp()

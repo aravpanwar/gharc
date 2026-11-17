@@ -49,16 +49,16 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
         e_dt = parse_date(end)
         if s_dt >= e_dt:
             raise ValueError(
-                f"--start ({start}) must be before --end ({end}); "
-                f"--end is exclusive."
+                f"expected --start before --end, got {start} and {end} "
+                f"(--end is exclusive)"
             )
         if workers < 1:
-            raise ValueError(f"--workers must be at least 1 (got {workers}).")
+            raise ValueError(f"expected --workers of at least 1, got {workers}")
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         if s_dt >= now:
             raise ValueError(
-                f"--start ({start}) is in the future; GHArchive has no data for "
-                f"that window yet. Dates are UTC."
+                f"expected --start in the past, got {start}; GHArchive has no "
+                f"data for that window yet (dates are UTC)"
             )
         if e_dt > now:
             logger.warning(

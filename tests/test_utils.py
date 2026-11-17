@@ -3,12 +3,12 @@ import pytest
 from gharc.utils import parse_date, date_range, get_url_for_time
 
 
-def test_parse_date_accepts_day_format():
-    assert parse_date("2024-01-15") == datetime(2024, 1, 15)
-
-
-def test_parse_date_accepts_hour_format():
-    assert parse_date("2024-01-15-07") == datetime(2024, 1, 15, 7)
+@pytest.mark.parametrize("text, expected", [
+    ("2024-01-15", datetime(2024, 1, 15)),
+    ("2024-01-15-07", datetime(2024, 1, 15, 7)),
+])
+def test_parse_date_accepts_day_and_hour(text, expected):
+    assert parse_date(text) == expected
 
 
 def test_parse_date_rejects_garbage():
