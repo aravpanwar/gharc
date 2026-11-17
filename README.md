@@ -4,7 +4,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/aravpanwar/gharc/actions/workflows/test.yml/badge.svg)](https://github.com/aravpanwar/gharc/actions)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![DOI](https://zenodo.org/badge/1112791047.svg)](https://doi.org/10.5281/zenodo.19814232)
 
 **Pull filtered slices of the GitHub Archive on a laptop, without holding raw hours on disk.**
@@ -20,18 +19,18 @@ The full GitHub Archive spans every public event since 2011: tens of terabytes c
 `gharc` takes a third route and filters during the download:
 1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
 2.  **Filtering:** Keeps only the events matching your filters (repositories, owners, actors, event types).
-3.  **Writing:** Appends the matches to a single **Parquet** or **JSONL** output via `pyarrow.ParquetWriter`.
+3.  **Writing:** Appends the matches to a single **Parquet** file (through `pyarrow.ParquetWriter`) or **JSONL** file.
 4.  **Cleanup:** Deletes the temporary download before moving to the next hour, so disk usage never accumulates.
 
 It is meant for researchers and students who need event-level GitHub data over long windows but do not have a warehouse account or the disk to hold raw months.
 
-![Architecture: GHArchive HTTPS to thread pool to resumable download to temp file to streaming decode and filter to DataWriter to output file.](paper/figures/architecture.png)
+![Architecture: GHArchive HTTPS to thread pool to resumable download to temp file to streaming decode and filter to DataWriter to output file.](docs/architecture.png)
 
 ---
 
 ## Key Features
 
-* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
+* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 290 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
 * **Resumable downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
 * **Parallel processing:** Hours in the range are downloaded and filtered across a thread pool.
 * **Filtering before parsing:** A byte-level token check rejects lines that cannot match before any JSON parsing. A line has to contain a token from each kind of filter you set (repositories and owners count as one), so pairing a repository with a common event type stays selective. With a selective filter most lines never reach the parser; a wide or empty filter gains nothing from this.
@@ -186,7 +185,7 @@ gharc.jsonl_to_parquet("spark_one_day.jsonl", "spark_one_day.parquet")
 
 ---
 
-##  Automating Bulk Downloads
+## Automating Bulk Downloads
 
 For long date ranges, the included [`examples/orchestrator.py`](examples/orchestrator.py) script runs `gharc` month by month so each year produces one Parquet file per month rather than one giant output:
 
@@ -209,7 +208,7 @@ gharc/
 ├── tests/            # pytest test suite
 ├── benchmarks/       # Reproducible runs that back the performance claims
 ├── examples/         # Driver scripts (e.g. month-by-month orchestrator)
-├── paper/            # paper.md, paper.bib, figures (the JOSS submission)
+├── docs/             # Architecture figure and its Mermaid source
 └── CITATION.cff      # GitHub-detectable citation metadata
 ```
 
@@ -222,15 +221,13 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 **Running Tests:**
 
 ```bash
-pip install -e ".[test]"
+pip install -e ".[test,fast]"
 pytest tests/
 ```
 
 ---
 
 ## Citation
-
-The accompanying paper is at [`paper/paper.pdf`](paper/paper.pdf) and is rebuilt automatically on every push by the [Paper CI workflow](.github/workflows/paper.yml).
 
 If you use `gharc` in your research, please cite it using the metadata in `CITATION.cff` or as follows:
 

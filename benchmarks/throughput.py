@@ -2,10 +2,9 @@
 
 Runs the same 6-hour window twice, once with one worker and once with four,
 captures wall-clock time, peak RSS, output size, and event count. Writes a
-single JSON result so the paper can cite real numbers.
+single JSON result that the README performance section is drawn from.
 """
 import json
-import os
 import threading
 import time
 from datetime import datetime

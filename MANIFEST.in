@@ -1,6 +1,8 @@
 include README.md
 include LICENSE
 include CITATION.cff
-recursive-include paper *
 recursive-include examples *.py
 recursive-include tests *.py
+prune docs
+prune benchmarks
+prune .github
