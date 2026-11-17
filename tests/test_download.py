@@ -54,7 +54,7 @@ def test_200_writes_content(tmp_path):
 
 def test_206_appends_to_partial_download(tmp_path):
     temp = tmp_path / "f.gz"
-    temp.write_bytes(b"AAAA")  # 4 bytes already on disk
+    temp.write_bytes(b"AAAA")
     session = _FakeSession(_FakeResponse(206, chunks=[b"BBBB"]))
 
     assert download_resumable("http://x", str(temp), session) == DOWNLOAD_OK

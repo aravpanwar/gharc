@@ -207,7 +207,7 @@ def test_process_range_parquet_failure_clears_state(tmp_path):
                 workers=1,
             )
 
-    # Parquet cannot resume, so the state file is cleared rather than left to
+    # Parquet keeps no marker, so a failed run cannot leave one behind to
     # dead-end the next run on the existing Parquet file.
     assert not (tmp_path / "out.parquet.state.json").exists()
 

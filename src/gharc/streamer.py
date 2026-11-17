@@ -541,13 +541,10 @@ def process_range(start, end, repos, event_types, output, workers,
                     elif data:
                         for record in data:
                             writer.write(record)
-                    # Flush the hour's events before marking it done. For JSONL
-                    # this makes the appended lines durable so a restart can skip
-                    # the hour and trust what is on disk. For Parquet the row
-                    # group is only readable after close(), so Parquet uses no
-                    # resume state (see _NoMarker). The committed byte offset is
-                    # recorded with the hour so a resume can trim a partially
-                    # written hour and stay exactly-once.
+                    # Flush the hour's events before marking it done, so a
+                    # restart can skip the hour and trust what is on disk. The
+                    # byte offset is recorded with the hour so a resume can trim
+                    # a partially written hour and stay exactly-once.
                     writer.flush()
                     offset = os.path.getsize(output) if os.path.exists(output) else 0
                     marker.mark_done(ts, offset)
@@ -557,10 +554,9 @@ def process_range(start, end, repos, event_types, output, workers,
                 finally:
                     pbar.update(1)
     except KeyboardInterrupt:
-        # Cancel the hours still queued so we stop soon rather than draining
-        # the pool. Any rows buffered for an hour that was not marked done are
-        # dropped. KeyboardInterrupt is re-raised so an API caller sees the
-        # normal interrupt; the CLI turns it into a non-zero exit.
+        # Rows buffered for an hour that was not marked done are dropped.
+        # KeyboardInterrupt is re-raised so an API caller sees the normal
+        # interrupt; the CLI turns it into a non-zero exit.
         stop.set()
         executor.shutdown(wait=False, cancel_futures=True)
         writer.buffer.clear()
@@ -586,12 +582,9 @@ def process_range(start, end, repos, event_types, output, workers,
 
     if failed:
         # Signal the failure rather than reporting a clean finish over partial
-        # output. For JSONL we keep the state file so a rerun retries only the
-        # failed hours. Parquet cannot be appended to, so a kept state file
-        # would only make the rerun dead-end on the existing file; clear it so
-        # the rerun starts the window over cleanly.
+        # output. JSONL keeps its marker so a rerun retries only the failed
+        # hours; Parquet never had one, so its rerun starts the window over.
         if writer.is_parquet:
-            marker.clear()
             hint = (
                 "rerun to start the window over, or use JSONL output to retry "
                 "only the failed hours"

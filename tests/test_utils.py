@@ -29,9 +29,8 @@ def test_date_range_is_end_exclusive():
 
 
 def test_date_range_full_month():
-    # The Spark study had a "7th month bleed-over" with the old inclusive
-    # semantics. Under exclusive end, --end 2024-02-01 cleanly stops at
-    # 2024-01-31 23:00 with no leakage into February.
+    # With an exclusive end, --end 2024-02-01 stops at 2024-01-31 23:00 and
+    # does not leak into February.
     start = datetime(2024, 1, 1, 0)
     end = datetime(2024, 2, 1, 0)
 

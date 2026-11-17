@@ -38,7 +38,7 @@ def test_fingerprint_mismatch_raises(tmp_path):
     different_fp = _run_fingerprint(
         datetime(2024, 1, 1),
         datetime(2024, 1, 2),
-        ["pandas-dev/pandas"],  # different repos
+        ["pandas-dev/pandas"],
         None,
         None,
         None,
