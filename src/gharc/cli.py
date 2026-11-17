@@ -9,7 +9,7 @@ from .streamer import process_range
 from .storage import jsonl_to_parquet
 
 
-def _split_csv(raw):
+def _purify_csv(raw):
     """Split a comma-separated option into a clean list, dropping blanks.
 
     Returns None when nothing usable is left. This keeps a value like
@@ -65,10 +65,10 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
                 "--end is in the future or very recent; GHArchive publishes each "
                 "hour a little after it ends, so the latest hours may be missing."
             )
-        repo_list = _split_csv(repos)
-        type_list = _split_csv(event_types)
-        org_list = _split_csv(orgs)
-        actor_list = _split_csv(actors)
+        repo_list = _purify_csv(repos)
+        type_list = _purify_csv(event_types)
+        org_list = _purify_csv(orgs)
+        actor_list = _purify_csv(actors)
 
         if s_dt < datetime(2015, 1, 1) and (repo_list or org_list):
             logger.warning(

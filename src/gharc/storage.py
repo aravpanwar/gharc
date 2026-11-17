@@ -45,11 +45,11 @@ EVENT_SCHEMA = pa.schema([
 def _events_to_table(events: list) -> pa.Table:
     """Turn a batch of events into a Parquet-ready table with a stable schema.
 
-    Nested fields are JSON-stringified in ``_flatten_event``, and building the
+    Nested fields are JSON-stringified in ``_purify_event``, and building the
     table against ``EVENT_SCHEMA`` fills any canonical column missing from this
     batch with nulls, so every batch written to a file looks identical.
     """
-    rows = [_flatten_event(e) for e in events]
+    rows = [_purify_event(e) for e in events]
     return pa.Table.from_pylist(rows, schema=EVENT_SCHEMA)
 
 
@@ -117,7 +117,7 @@ class DataWriter:
                 for rec in self.buffer:
                     # ensure_ascii=False keeps non-English text readable and
                     # smaller, and matches how nested fields are stored for
-                    # Parquet in _flatten_event.
+                    # Parquet in _purify_event.
                     f.write(json.dumps(rec, ensure_ascii=False) + '\n')
 
         self.buffer = []
@@ -145,7 +145,7 @@ class DataWriter:
         logger.info(f"Wrote output to {self.filename}")
 
 
-def _flatten_event(event: dict) -> dict:
+def _purify_event(event: dict) -> dict:
     # JSON-stringify nested canonical fields so Parquet sees a stable flat
     # schema, and collect any unrecognized top-level fields into `other` so
     # nothing is silently dropped.
