@@ -431,7 +431,7 @@ def _sweep_hours(executor, run_hour, hours, depth, interval=0.5):
 def _reconcile_jsonl_marker(output, marker_offset):
     """Line up a JSONL output with its resume checkpoint before appending.
 
-    Rows past ``committed_offset`` belong to an hour that was interrupted
+    Rows past ``marker_offset`` belong to an hour that was interrupted
     before it was marked done, so they are trimmed to keep resume exactly-once.
     An output shorter than the checkpoint means it was truncated or deleted, so
     the checkpoint can no longer be trusted and the run stops with an error.
@@ -453,16 +453,16 @@ def process_range(start, end, repos, event_types, output, workers,
     """Stream-and-filter GHArchive over [start, end) and write matching events.
 
     Hours in the range are dispatched to a thread pool. Each worker downloads
-    the corresponding GHArchive file, applies the repo and event-type filters,
-    and returns matching events. The main thread writes them through a
-    DataWriter (Parquet via streaming append, or JSONL).
+    the corresponding GHArchive file, applies the filters, and returns
+    matching events. The main thread writes them through a DataWriter
+    (Parquet via streaming append, or JSONL).
 
-    Crash safety: a `<output>.state.json` file records which hours have
-    finished. Restarting the same command picks up where it left off. The
-    state file is removed on clean completion. Resume into an existing
-    Parquet output is rejected because Parquet writers cannot append to a
-    closed file; use JSONL for runs that may need to be resumed and convert
-    afterwards with ``gharc convert``.
+    Crash safety: for JSONL output a `<output>.state.json` file records which
+    hours have finished, so restarting the same command picks up where it left
+    off. The state file is removed on clean completion. Parquet writers cannot
+    append to a closed file, so Parquet output keeps no state file and a rerun
+    starts the window over, replacing the earlier file. Use JSONL for runs that
+    may need to be resumed and convert afterwards with ``gharc convert``.
 
     Args:
         start: Inclusive start datetime (rounded to the hour).
