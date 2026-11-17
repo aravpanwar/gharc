@@ -14,12 +14,11 @@ Please open an issue on GitHub if you encounter:
 
 ## How to Submit Changes
 1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/amazing-feature`).
-3. Make your changes.
+2. Create a branch named for the change (`git checkout -b resume-on-parquet`).
+3. Make your changes, adding a test for any behavior you fix or add.
 4. **Run the tests**: Ensure `pytest` passes locally.
-5. Commit your changes (`git commit -m 'Add some amazing feature'`).
-6. Push to the branch (`git push origin feature/amazing-feature`).
-7. Open a Pull Request.
+5. Commit with a message that says what the change is for, then push the branch.
+6. Open a Pull Request describing the problem and how you checked the fix.
 
 ## Development Setup
 ```bash
@@ -27,8 +26,8 @@ Please open an issue on GitHub if you encounter:
 git clone https://github.com/aravpanwar/gharc.git
 cd gharc
 python3 -m venv venv
-source venv/bin/activate
-pip install -e ".[test]"
+source venv/bin/activate        # Windows PowerShell: .\venv\Scripts\Activate.ps1
+pip install -e ".[test,fast]"   # fast adds orjson so both JSON parsers are tested
 ```
 
 ## Running Tests
