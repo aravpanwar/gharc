@@ -301,13 +301,36 @@ def test_process_single_hour_raises_when_stopped_and_cleans_up(tmp_path):
     assert made and not any(os.path.exists(p) for p in made)
 
 
-def test_as_completed_interruptibly_yields_every_future_once():
+def test_sweep_hours_runs_every_hour_once_with_a_bounded_queue():
     from concurrent.futures import ThreadPoolExecutor
-    from gharc.streamer import _as_completed_interruptibly
+    from gharc.streamer import _sweep_hours
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        # One future outlasts several polling intervals to exercise the loop.
-        futures = [executor.submit(time.sleep, d) for d in (0, 0.05, 0.3)]
-        seen = list(_as_completed_interruptibly(futures, interval=0.02))
+    class CountingExecutor:
+        """Records the most unfinished hours ever queued at once."""
 
-    assert sorted(map(id, seen)) == sorted(map(id, futures))
+        def __init__(self, inner):
+            self.inner = inner
+            self.futures = []
+            self.most = 0
+
+        def submit(self, fn, *args):
+            future = self.inner.submit(fn, *args)
+            self.futures.append(future)
+            unfinished = sum(1 for f in self.futures if not f.done())
+            self.most = max(self.most, unfinished)
+            return future
+
+    def run_hour(hour):
+        # Every fifth hour outlasts several polling intervals.
+        time.sleep(0.06 if hour % 5 == 0 else 0)
+        return hour * 10
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        executor = CountingExecutor(pool)
+        seen = []
+        for hour, future in _sweep_hours(executor, run_hour, range(40), depth=4,
+                                         interval=0.02):
+            seen.append((hour, future.result()))
+
+    assert sorted(seen) == [(h, h * 10) for h in range(40)]
+    assert executor.most <= 4

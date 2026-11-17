@@ -394,21 +394,37 @@ def _run_fingerprint(start, end, repos, event_types, orgs, actors):
     }
 
 
-def _as_completed_interruptibly(futures, interval=0.5):
-    """Yield futures as they finish, waking at least every ``interval`` seconds.
+def _sweep_hours(executor, run_hour, hours, depth, interval=0.5):
+    """Run hours on the executor and yield ``(hour, future)`` as each finishes.
 
-    ``concurrent.futures.as_completed`` waits on a lock with no timeout, and on
-    Windows Ctrl+C cannot break that wait, so an interrupt would only land when
-    the next hour happened to finish. Waking up regularly returns control to
-    the interpreter, which raises KeyboardInterrupt at once on every platform.
+    Only ``depth`` hours are queued at a time, and the next one is submitted as
+    each finishes. Submitting a whole window up front made every wait below
+    rescan all of its queued futures, a cost that grew with the window (over a
+    third of a core for ten years of hours), and held them all in memory.
+
+    The wait wakes at least every ``interval`` seconds because otherwise it
+    blocks on a lock that Ctrl+C cannot break on Windows, so an interrupt would
+    only land when the next hour happened to finish. Waking up regularly
+    returns control to the interpreter, which raises KeyboardInterrupt at once.
     """
-    pending = set(futures)
+    hours = iter(hours)
+    pending = {}
+
+    def submit_next():
+        hour = next(hours, None)
+        if hour is not None:
+            pending[executor.submit(run_hour, hour)] = hour
+
+    for _ in range(depth):
+        submit_next()
     while pending:
-        done, pending = concurrent.futures.wait(
+        done, _ = concurrent.futures.wait(
             pending, timeout=interval,
             return_when=concurrent.futures.FIRST_COMPLETED,
         )
-        yield from done
+        for future in done:
+            submit_next()
+            yield pending.pop(future), future
 
 
 def _reconcile_jsonl_offset(output, committed_offset):
@@ -502,12 +518,9 @@ def process_range(start, end, repos, event_types, output, workers,
     # finished on its own.
     stop = _RunStop()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-    future_to_time = {
-        executor.submit(
-            process_single_hour, ts, repos, event_types, orgs, actors, stop=stop
-        ): ts
-        for ts in todo
-    }
+
+    def run_hour(ts):
+        return process_single_hour(ts, repos, event_types, orgs, actors, stop=stop)
 
     try:
         with tqdm(
@@ -518,8 +531,7 @@ def process_range(start, end, repos, event_types, output, workers,
             dynamic_ncols=True,
         ) as pbar:
 
-            for future in _as_completed_interruptibly(future_to_time):
-                ts = future_to_time[future]
+            for ts, future in _sweep_hours(executor, run_hour, todo, depth=workers * 2):
                 try:
                     data = future.result()
                     if data is None:
