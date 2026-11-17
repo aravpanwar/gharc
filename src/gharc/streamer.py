@@ -6,6 +6,7 @@ import concurrent.futures
 import threading
 import time
 import os
+import socket
 import tempfile
 from datetime import datetime
 from requests.adapters import HTTPAdapter
@@ -23,10 +24,33 @@ except ImportError:
 
 _thread_local = threading.local()
 
+
+class _StoppableRetry(Retry):
+    """urllib3 retry policy whose backoff sleep gives way to a stopped run.
+
+    urllib3 sleeps inside the request call between retries, up to about half
+    a minute through a burst of 503s, where the run's stop signal cannot
+    otherwise reach it. Waiting on the worker's stop event instead lets Ctrl+C
+    cut the backoff short.
+    """
+
+    def sleep(self, response=None):
+        stop = getattr(_thread_local, "stop", None)
+        if stop is None:
+            return super().sleep(response)
+        delay = None
+        if self.respect_retry_after_header and response is not None:
+            delay = self.get_retry_after(response)
+        if delay is None:
+            delay = self.get_backoff_time()
+        if stop.wait(delay):
+            raise _HourStopped("stopped during a retry backoff")
+
+
 def get_robust_session():
     """Creates a requests session with retry logic."""
     session = requests.Session()
-    retry_strategy = Retry(
+    retry_strategy = _StoppableRetry(
         total=5,
         backoff_factor=1,
         status_forcelist=[429, 500, 502, 503, 504],
@@ -61,6 +85,73 @@ def _raise_if_stopped(stop, url):
         raise _HourStopped(f"stopped before {url} finished")
 
 
+def _response_socket(response):
+    # The socket is the only handle another thread can use to wake a read that
+    # is blocked on a stalled link. On a kept-alive connection it stays on the
+    # urllib3 connection; when the server will close the connection after the
+    # response, http.client moves it onto the response's file instead.
+    connection = getattr(response.raw, "connection", None)
+    sock = getattr(connection, "sock", None)
+    if sock is None:
+        fp = getattr(getattr(response.raw, "_fp", None), "fp", None)
+        sock = getattr(getattr(fp, "raw", None), "_sock", None)
+    return sock
+
+
+def _shut(sock):
+    # shutdown wakes a blocked read on Linux and macOS but not on Windows, where
+    # only closing the handle does. A plain close() is deferred while the HTTP
+    # response's file still holds the socket, so the socket's real close is
+    # used when it exists.
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    try:
+        getattr(sock, "_real_close", sock.close)()
+    except OSError:
+        pass
+
+
+class _RunStop(threading.Event):
+    """Stop signal shared by a run's workers.
+
+    Setting it also shuts down the socket of every download in progress. A
+    worker blocked reading from a stalled connection would otherwise notice
+    the stop only when the read timeout expired, more than two minutes later.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._lock = threading.Lock()
+        self._sockets = set()
+
+    def watch(self, response):
+        """Track a streaming response's socket; returns a handle for unwatch."""
+        sock = _response_socket(response)
+        if sock is None:
+            return None
+        with self._lock:
+            if not self.is_set():
+                self._sockets.add(sock)
+                return sock
+        _shut(sock)
+        return None
+
+    def unwatch(self, sock):
+        if sock is not None:
+            with self._lock:
+                self._sockets.discard(sock)
+
+    def set(self):
+        with self._lock:
+            super().set()
+            sockets = list(self._sockets)
+            self._sockets.clear()
+        for sock in sockets:
+            _shut(sock)
+
+
 def download_resumable(url: str, temp_path: str, session: requests.Session,
                        stop: threading.Event = None) -> str:
     """Download a file with resume capability.
@@ -84,24 +175,29 @@ def download_resumable(url: str, temp_path: str, session: requests.Session,
 
     try:
         with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
-            if r.status_code == 416: # Range not satisfiable (file done)
-                return DOWNLOAD_OK
-            if r.status_code in (404, 410):
-                logger.debug(f"HTTP {r.status_code} for {url} (archive not present)")
-                return DOWNLOAD_MISSING
-            if r.status_code not in [200, 206]:
-                logger.debug(f"HTTP {r.status_code} for {url}")
-                return DOWNLOAD_RETRY
+            watched = stop.watch(r) if isinstance(stop, _RunStop) else None
+            try:
+                if r.status_code == 416: # Range not satisfiable (file done)
+                    return DOWNLOAD_OK
+                if r.status_code in (404, 410):
+                    logger.debug(f"HTTP {r.status_code} for {url} (archive not present)")
+                    return DOWNLOAD_MISSING
+                if r.status_code not in [200, 206]:
+                    logger.debug(f"HTTP {r.status_code} for {url}")
+                    return DOWNLOAD_RETRY
 
-            if r.status_code == 200 and mode == 'ab':
-                mode = 'wb'
+                if r.status_code == 200 and mode == 'ab':
+                    mode = 'wb'
 
-            with open(temp_path, mode) as f:
-                for chunk in r.iter_content(chunk_size=65536):
-                    if stop is not None and stop.is_set():
-                        return DOWNLOAD_RETRY
-                    if chunk:
-                        f.write(chunk)
+                with open(temp_path, mode) as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        if stop is not None and stop.is_set():
+                            return DOWNLOAD_RETRY
+                        if chunk:
+                            f.write(chunk)
+            finally:
+                if watched is not None:
+                    stop.unwatch(watched)
         return DOWNLOAD_OK
     except Exception as e:
         logger.debug(f"Download attempt failed for {url}: {e}")
@@ -115,7 +211,9 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
     Returns the list of events matching the filters (possibly empty), or None if
     GHArchive has no archive for that hour (a known gap), so the caller can tell
     an absent hour apart from an hour that simply had no matches. Setting
-    ``stop`` from another thread makes the hour give up promptly by raising.
+    ``stop`` from another thread makes the hour raise at its next downloaded
+    chunk, retry, backoff or archive line; a run's ``_RunStop`` also wakes a
+    read that is blocked on a stalled connection.
     """
     url = get_url_for_time(dt)
     results = []
@@ -131,6 +229,9 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
     os.close(fd)
     
     download_success = False
+    # The retry policy's backoff sleep runs deep inside requests, so it finds
+    # this hour's stop signal through the worker thread instead.
+    _thread_local.stop = stop
 
     try:
         for attempt in range(10):
@@ -143,7 +244,10 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                 logger.debug(f"No archive available at {url}")
                 return None
             _raise_if_stopped(stop, url)
-            time.sleep(2)
+            if stop is not None:
+                stop.wait(2)
+            else:
+                time.sleep(2)
 
         if not download_success:
             # A persistent download failure is a real failure, not an empty
@@ -186,6 +290,7 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
         return results
 
     finally:
+        _thread_local.stop = None
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -395,7 +500,7 @@ def process_range(start, end, repos, event_types, output, workers,
     # told to give up through `stop`, because otherwise the final
     # shutdown(wait=True) would sit until each in-flight download and parse
     # finished on its own.
-    stop = threading.Event()
+    stop = _RunStop()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
     future_to_time = {
         executor.submit(
