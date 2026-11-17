@@ -65,7 +65,7 @@ def test_process_single_hour_combined_filter_on_both_parsers(use_orjson):
 @patch('gharc.streamer.time.sleep', lambda *_: None)
 @patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_RETRY)
 def test_process_single_hour_raises_on_persistent_download_failure(_mock):
-    with pytest.raises(RuntimeError, match="Failed to download"):
+    with pytest.raises(RuntimeError, match="failed to download"):
         process_single_hour(datetime(2024, 1, 1, 0), repos=["apache/spark"], event_types=None)
 
 
@@ -80,7 +80,7 @@ def test_process_single_hour_returns_none_on_missing_archive(_mock):
 def test_process_single_hour_raises_on_corrupt_archive(_mock):
     # A download that lands but is not valid gzip means the hour is incomplete.
     with patch('gharc.streamer.gzip.open', side_effect=OSError("Not a gzipped file")):
-        with pytest.raises(RuntimeError, match="Failed to read archive"):
+        with pytest.raises(RuntimeError, match="couldn't read archive"):
             process_single_hour(datetime(2024, 1, 1, 0), repos=["apache/spark"], event_types=None)
 
 

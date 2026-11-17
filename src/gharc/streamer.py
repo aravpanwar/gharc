@@ -254,8 +254,8 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
             # hour. Raise so the run reports it and (for JSONL output) retries
             # this hour on resume, rather than silently dropping it.
             raise RuntimeError(
-                f"Failed to download {url} after 10 attempts "
-                f"(run with debug logging for details)"
+                f"failed to download {url} after 10 attempts "
+                f"(run with --debug for details)"
             )
 
         try:
@@ -285,7 +285,7 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
             # the events collected so far are an incomplete view of the hour.
             # Raise rather than return a partial result, so the hour is retried
             # on resume instead of being recorded as complete.
-            raise RuntimeError(f"Failed to read archive for {url}: {e}")
+            raise RuntimeError(f"couldn't read archive {url}: {e}") from e
 
         return results
 
@@ -320,8 +320,8 @@ class _RunState:
                 return
             if payload.get("fingerprint") != fingerprint:
                 raise ValueError(
-                    f"State file {self._path} was written for a different run "
-                    f"(window or filters changed). Remove it or use a new --output."
+                    f"state file {self._path} belongs to a different run "
+                    f"(window or filters changed); remove it or use a new --output"
                 )
             self._done = set(payload.get("done_hours", []))
             self._committed_offset = payload.get("committed_offset", 0)
@@ -438,9 +438,9 @@ def _reconcile_jsonl_offset(output, committed_offset):
     size = os.path.getsize(output) if os.path.exists(output) else 0
     if size < committed_offset:
         raise ValueError(
-            f"{output} is shorter than its resume checkpoint "
+            f"output {output} is shorter than its resume checkpoint "
             f"({size} < {committed_offset} bytes); it looks truncated or "
-            f"deleted. Remove {output}.state.json to start the window over."
+            f"deleted, so remove {output}.state.json to start the window over"
         )
     if size > committed_offset:
         with open(output, "r+b") as f:
@@ -592,14 +592,14 @@ def process_range(start, end, repos, event_types, output, workers,
         if writer.is_parquet:
             state.clear()
             hint = (
-                "Rerun to start the window over, or use JSONL output to retry "
-                "only the failed hours."
+                "rerun to start the window over, or use JSONL output to retry "
+                "only the failed hours"
             )
         else:
-            hint = "Rerun the same command to retry the failed hours."
+            hint = "rerun the same command to retry the failed hours"
         raise RuntimeError(
-            f"{len(failed)} of {len(todo)} hours failed; output at {output} is "
-            f"incomplete. {hint}"
+            f"failed {len(failed)} of {len(todo)} hours, so {output} is "
+            f"incomplete; {hint}"
         )
 
     state.clear()
