@@ -289,6 +289,23 @@ def _run_fingerprint(start, end, repos, event_types, orgs, actors):
     }
 
 
+def _as_completed_interruptibly(futures, interval=0.5):
+    """Yield futures as they finish, waking at least every ``interval`` seconds.
+
+    ``concurrent.futures.as_completed`` waits on a lock with no timeout, and on
+    Windows Ctrl+C cannot break that wait, so an interrupt would only land when
+    the next hour happened to finish. Waking up regularly returns control to
+    the interpreter, which raises KeyboardInterrupt at once on every platform.
+    """
+    pending = set(futures)
+    while pending:
+        done, pending = concurrent.futures.wait(
+            pending, timeout=interval,
+            return_when=concurrent.futures.FIRST_COMPLETED,
+        )
+        yield from done
+
+
 def _reconcile_jsonl_offset(output, committed_offset):
     """Line up a JSONL output with its resume checkpoint before appending.
 
@@ -396,7 +413,7 @@ def process_range(start, end, repos, event_types, output, workers,
             dynamic_ncols=True,
         ) as pbar:
 
-            for future in concurrent.futures.as_completed(future_to_time):
+            for future in _as_completed_interruptibly(future_to_time):
                 ts = future_to_time[future]
                 try:
                     data = future.result()

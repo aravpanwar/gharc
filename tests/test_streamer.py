@@ -299,3 +299,15 @@ def test_process_single_hour_raises_when_stopped_and_cleans_up(tmp_path):
 
     mock_dl.assert_not_called()
     assert made and not any(os.path.exists(p) for p in made)
+
+
+def test_as_completed_interruptibly_yields_every_future_once():
+    from concurrent.futures import ThreadPoolExecutor
+    from gharc.streamer import _as_completed_interruptibly
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # One future outlasts several polling intervals to exercise the loop.
+        futures = [executor.submit(time.sleep, d) for d in (0, 0.05, 0.3)]
+        seen = list(_as_completed_interruptibly(futures, interval=0.02))
+
+    assert sorted(map(id, seen)) == sorted(map(id, futures))
