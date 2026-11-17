@@ -19,7 +19,7 @@ The full GitHub Archive spans every public event since 2011: tens of terabytes c
 `gharc` takes a third route and filters during the download:
 1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
 2.  **Filtering:** Keeps only the events matching your filters (repositories, owners, actors, event types).
-3.  **Writing:** Appends the matches to a single **Parquet** or **JSONL** output via `pyarrow.ParquetWriter`.
+3.  **Writing:** Appends the matches to a single **Parquet** file (through `pyarrow.ParquetWriter`) or **JSONL** file.
 4.  **Cleanup:** Deletes the temporary download before moving to the next hour, so disk usage never accumulates.
 
 It is meant for researchers and students who need event-level GitHub data over long windows but do not have a warehouse account or the disk to hold raw months.
@@ -30,7 +30,7 @@ It is meant for researchers and students who need event-level GitHub data over l
 
 ## Key Features
 
-* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
+* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 290 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
 * **Resumable downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
 * **Parallel processing:** Hours in the range are downloaded and filtered across a thread pool.
 * **Filtering before parsing:** A byte-level token check rejects lines that cannot match before any JSON parsing. A line has to contain a token from each kind of filter you set (repositories and owners count as one), so pairing a repository with a common event type stays selective. With a selective filter most lines never reach the parser; a wide or empty filter gains nothing from this.
@@ -185,7 +185,7 @@ gharc.jsonl_to_parquet("spark_one_day.jsonl", "spark_one_day.parquet")
 
 ---
 
-##  Automating Bulk Downloads
+## Automating Bulk Downloads
 
 For long date ranges, the included [`examples/orchestrator.py`](examples/orchestrator.py) script runs `gharc` month by month so each year produces one Parquet file per month rather than one giant output:
 
