@@ -135,7 +135,7 @@ gharc download \
 | `--end` | End date in UTC, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH) | `2024-02-01` |
 | `--repos` | Comma-separated repositories to keep; supports `owner/*` wildcards | `apache/spark,apache/*` |
 | `--orgs` | Comma-separated repository owners to keep | `apache,pandas-dev` |
-| `--actors` | Comma-separated actor logins to keep | `dongjoon-hyun,cloud-fan` |
+| `--actors` | Comma-separated actor logins to keep | `gustav-victor,mira-holt` |
 | `--event-types` | Comma-separated list of GHArchive event types | `WatchEvent,ForkEvent` |
 | `--output` | Output filename (`.parquet` or `.jsonl`) | `data.parquet` |
 | `--workers` | Number of parallel download threads (default: 4) | `8` |

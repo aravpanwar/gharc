@@ -34,7 +34,7 @@ def main(debug):
 @click.option('--end', required=True, help='End date in UTC, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
 @click.option('--repos', help='Comma-separated repos; supports owner/* wildcards (e.g. apache/spark, apache/*)')
 @click.option('--orgs', help='Comma-separated repository owners to keep (e.g. apache)')
-@click.option('--actors', help='Comma-separated actor logins to keep (e.g. dongjoon-hyun)')
+@click.option('--actors', help='Comma-separated actor logins to keep (e.g. gustav-victor)')
 @click.option('--event-types', help='Comma-separated events (e.g. PushEvent)')
 @click.option('--output', default='filtered.jsonl', help='Output file')
 @click.option('--workers', default=4, help='Parallel downloads')
