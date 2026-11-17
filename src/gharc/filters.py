@@ -36,8 +36,11 @@ def passes_filters(event_dict: dict, repos: list = None, event_types: list = Non
     are separate groups that must also match when given. A group left as None is
     ignored (pass-through).
     """
+    # A nested object can be null as well as absent, especially in events
+    # built by hand rather than read from the archive, so `or {}` covers both
+    # shapes and a null repo or actor is a plain non-match.
     if repos or orgs:
-        repo_name = event_dict.get('repo', {}).get('name')
+        repo_name = (event_dict.get('repo') or {}).get('name')
         if not _repo_selected(repo_name, repos, orgs):
             return False
 
@@ -45,7 +48,7 @@ def passes_filters(event_dict: dict, repos: list = None, event_types: list = Non
         return False
 
     if actors:
-        actor_login = event_dict.get('actor', {}).get('login')
+        actor_login = (event_dict.get('actor') or {}).get('login')
         if actor_login not in actors:
             return False
 

@@ -118,3 +118,13 @@ def test_passes_prefilter_works_on_bytes():
     groups = [[b"apache/"], [b"PushEvent"]]
     assert passes_prefilter(b'{"type":"PushEvent","repo":{"name":"apache/x"}}', groups)
     assert not passes_prefilter(b'{"type":"PushEvent","repo":{"name":"other/x"}}', groups)
+
+
+def test_passes_filters_treats_null_nested_fields_as_no_match():
+    event = {"repo": None, "actor": None, "type": "PushEvent"}
+
+    assert passes_filters(event, repos=["apache/spark"]) is False
+    assert passes_filters(event, orgs=["apache"]) is False
+    assert passes_filters(event, actors=["bob"]) is False
+    # A filter that does not look at the null field still applies normally.
+    assert passes_filters(event, event_types=["PushEvent"]) is True
