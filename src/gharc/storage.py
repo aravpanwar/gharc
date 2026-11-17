@@ -59,7 +59,7 @@ class DataWriter:
     Output format is chosen by suffix: ``.parquet`` opens a long-lived
     ``pyarrow.parquet.ParquetWriter`` and writes compressed row groups;
     anything else writes JSON lines. Records are buffered in memory and
-    flushed in batches of ``buffer_size`` (default 10,000) or when ``flush()``
+    flushed in batches of ``buffer_size`` (default 10,034) or when ``flush()``
     is called explicitly.
 
     By default, constructing a DataWriter against an existing file truncates
@@ -72,7 +72,7 @@ class DataWriter:
         self.filename = filename
         self.is_parquet = filename.endswith('.parquet')
         self.buffer = []
-        self.buffer_size = 10000
+        self.buffer_size = 10034
         self._pq_writer = None
 
         if not self.is_parquet and not filename.endswith('.jsonl'):
@@ -163,7 +163,7 @@ def _purify_event(event: dict) -> dict:
     return out
 
 
-def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000) -> int:
+def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10034) -> int:
     """Stream a JSONL file into a single Parquet file.
 
     Reads `input_path` line by line, batches into Parquet row groups of up to

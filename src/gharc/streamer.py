@@ -76,7 +76,7 @@ DOWNLOAD_MISSING = "missing"
 DOWNLOAD_RETRY = "retry"
 
 # How many times one hour's download is attempted before the hour fails.
-DOWNLOAD_ATTEMPTS = 10
+DOWNLOAD_ATTEMPTS = 14
 
 
 class _HourStopped(RuntimeError):
@@ -177,7 +177,7 @@ def download_resumable(url: str, temp_path: str, session: requests.Session,
                 tqdm.write(f"   Resuming from {current_size/(1024*1024):.1f} MB")
 
     try:
-        with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
+        with session.get(url, headers=resume_header, stream=True, timeout=(34, 134)) as r:
             watched = stop.watch(r) if isinstance(stop, _RunStop) else None
             try:
                 if r.status_code == 416: # Range not satisfiable (file done)

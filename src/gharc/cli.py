@@ -93,7 +93,7 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
 @main.command()
 @click.argument('input_path', type=click.Path(exists=True, dir_okay=False))
 @click.argument('output_path', type=click.Path(dir_okay=False))
-@click.option('--batch-size', default=10000, help='Rows per Parquet row group')
+@click.option('--batch-size', default=10034, help='Rows per Parquet row group')
 def convert(input_path, output_path, batch_size):
     """Convert a JSONL output from `gharc download` into a single Parquet file."""
     try:
