@@ -6,6 +6,32 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- `gharc convert` no longer deletes its input when given the same path for
+  input and output; the conversion is refused instead. A conversion that fails
+  partway now leaves any earlier output in place, since the new file is only
+  renamed over it once complete. A batch size below 1 is rejected.
+- Ctrl+C now also stops the hours already in flight at their next downloaded
+  chunk, retry or archive line, instead of waiting for each running download
+  and parse to finish before exiting. Temporary downloads are still removed.
+  On Windows the interrupt previously registered only when the next hour
+  finished; it now registers within half a second. A download stalled on a
+  dead connection and urllib3's retry backoff through a run of 503s no longer
+  hold the exit until they time out.
+- `passes_filters` treats a null `repo` or `actor` as a non-match rather than
+  raising `AttributeError`.
+
+### Changed
+- The byte-level prefilter requires a token from every active filter group
+  (repositories and owners, event types, actors) instead of any token at all.
+  Pairing a repository with a common event type no longer sends every event of
+  that type to the JSON parser: on a sampled 2024 hour,
+  `--repos apache/spark --event-types PushEvent` parsed 1 line instead of
+  136,796, with the same result. `gharc.filters.prefilter_tokens` is replaced
+  by `prefilter_groups` and `passes_prefilter`.
+- `process_range` queues two hours per worker at a time instead of the whole
+  window, so its memory and polling cost no longer grow with window length.
+
 ## [0.1.5] - 2026-08-25
 
 ### Added

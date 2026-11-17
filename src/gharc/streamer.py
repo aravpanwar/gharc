@@ -6,16 +6,16 @@ import concurrent.futures
 import threading
 import time
 import os
+import socket
 import tempfile
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from tqdm import tqdm
 from .utils import get_url_for_time, date_range, logger
-from .filters import passes_filters, fast_string_check, prefilter_tokens
+from .filters import passes_filters, passes_prefilter, prefilter_groups
 from .storage import DataWriter
 
-# Use orjson if available for 3-5x faster parsing
 try:
     import orjson
     HAS_ORJSON = True
@@ -24,10 +24,33 @@ except ImportError:
 
 _thread_local = threading.local()
 
+
+class _StoppableRetry(Retry):
+    """urllib3 retry policy whose backoff sleep gives way to a stopped run.
+
+    urllib3 sleeps inside the request call between retries, up to about half
+    a minute through a burst of 503s, where the run's stop signal cannot
+    otherwise reach it. Waiting on the worker's stop event instead lets Ctrl+C
+    cut the backoff short.
+    """
+
+    def sleep(self, response=None):
+        stop = getattr(_thread_local, "stop", None)
+        if stop is None:
+            return super().sleep(response)
+        delay = None
+        if self.respect_retry_after_header and response is not None:
+            delay = self.get_retry_after(response)
+        if delay is None:
+            delay = self.get_backoff_time()
+        if stop.wait(delay):
+            raise _HourStopped("stopped during a retry backoff")
+
+
 def get_robust_session():
     """Creates a requests session with retry logic."""
     session = requests.Session()
-    retry_strategy = Retry(
+    retry_strategy = _StoppableRetry(
         total=5,
         backoff_factor=1,
         status_forcelist=[429, 500, 502, 503, 504],
@@ -53,12 +76,91 @@ DOWNLOAD_MISSING = "missing"
 DOWNLOAD_RETRY = "retry"
 
 
-def download_resumable(url: str, temp_path: str, session: requests.Session) -> str:
+class _HourStopped(RuntimeError):
+    """Raised inside a worker when the run asked in-flight hours to give up."""
+
+
+def _raise_if_stopped(stop, url):
+    if stop is not None and stop.is_set():
+        raise _HourStopped(f"stopped before {url} finished")
+
+
+def _response_socket(response):
+    # The socket is the only handle another thread can use to wake a read that
+    # is blocked on a stalled link. On a kept-alive connection it stays on the
+    # urllib3 connection; when the server will close the connection after the
+    # response, http.client moves it onto the response's file instead.
+    connection = getattr(response.raw, "connection", None)
+    sock = getattr(connection, "sock", None)
+    if sock is None:
+        fp = getattr(getattr(response.raw, "_fp", None), "fp", None)
+        sock = getattr(getattr(fp, "raw", None), "_sock", None)
+    return sock
+
+
+def _shut(sock):
+    # shutdown wakes a blocked read on Linux and macOS but not on Windows, where
+    # only closing the handle does. A plain close() is deferred while the HTTP
+    # response's file still holds the socket, so the socket's real close is
+    # used when it exists.
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    try:
+        getattr(sock, "_real_close", sock.close)()
+    except OSError:
+        pass
+
+
+class _RunStop(threading.Event):
+    """Stop signal shared by a run's workers.
+
+    Setting it also shuts down the socket of every download in progress. A
+    worker blocked reading from a stalled connection would otherwise notice
+    the stop only when the read timeout expired, more than two minutes later.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._lock = threading.Lock()
+        self._sockets = set()
+
+    def watch(self, response):
+        """Track a streaming response's socket; returns a handle for unwatch."""
+        sock = _response_socket(response)
+        if sock is None:
+            return None
+        with self._lock:
+            if not self.is_set():
+                self._sockets.add(sock)
+                return sock
+        _shut(sock)
+        return None
+
+    def unwatch(self, sock):
+        if sock is not None:
+            with self._lock:
+                self._sockets.discard(sock)
+
+    def set(self):
+        with self._lock:
+            super().set()
+            sockets = list(self._sockets)
+            self._sockets.clear()
+        for sock in sockets:
+            _shut(sock)
+
+
+def download_resumable(url: str, temp_path: str, session: requests.Session,
+                       stop: threading.Event = None) -> str:
     """Download a file with resume capability.
 
     Returns ``DOWNLOAD_OK`` once the file is in place, ``DOWNLOAD_MISSING`` if
     the server says the archive does not exist (HTTP 404 or 410), or
-    ``DOWNLOAD_RETRY`` for a transient failure the caller should retry.
+    ``DOWNLOAD_RETRY`` for a transient failure the caller should retry. If
+    ``stop`` is set mid-transfer the download is abandoned and reported as
+    ``DOWNLOAD_RETRY``; the caller checks ``stop`` before retrying.
     """
     resume_header = {}
     mode = 'wb'
@@ -73,43 +175,53 @@ def download_resumable(url: str, temp_path: str, session: requests.Session) -> s
 
     try:
         with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
-            if r.status_code == 416: # Range not satisfiable (file done)
-                return DOWNLOAD_OK
-            if r.status_code in (404, 410):
-                logger.debug(f"HTTP {r.status_code} for {url} (archive not present)")
-                return DOWNLOAD_MISSING
-            if r.status_code not in [200, 206]:
-                logger.debug(f"HTTP {r.status_code} for {url}")
-                return DOWNLOAD_RETRY
+            watched = stop.watch(r) if isinstance(stop, _RunStop) else None
+            try:
+                if r.status_code == 416: # Range not satisfiable (file done)
+                    return DOWNLOAD_OK
+                if r.status_code in (404, 410):
+                    logger.debug(f"HTTP {r.status_code} for {url} (archive not present)")
+                    return DOWNLOAD_MISSING
+                if r.status_code not in [200, 206]:
+                    logger.debug(f"HTTP {r.status_code} for {url}")
+                    return DOWNLOAD_RETRY
 
-            if r.status_code == 200 and mode == 'ab':
-                mode = 'wb'
+                if r.status_code == 200 and mode == 'ab':
+                    mode = 'wb'
 
-            with open(temp_path, mode) as f:
-                for chunk in r.iter_content(chunk_size=65536):
-                    if chunk:
-                        f.write(chunk)
+                with open(temp_path, mode) as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        if stop is not None and stop.is_set():
+                            return DOWNLOAD_RETRY
+                        if chunk:
+                            f.write(chunk)
+            finally:
+                if watched is not None:
+                    stop.unwatch(watched)
         return DOWNLOAD_OK
     except Exception as e:
         logger.debug(f"Download attempt failed for {url}: {e}")
         return DOWNLOAD_RETRY
 
 def process_single_hour(dt: datetime, repos: list, event_types: list,
-                        orgs: list = None, actors: list = None):
+                        orgs: list = None, actors: list = None,
+                        stop: threading.Event = None):
     """Download one hour, keep matching events, delete the temp file.
 
     Returns the list of events matching the filters (possibly empty), or None if
     GHArchive has no archive for that hour (a known gap), so the caller can tell
-    an absent hour apart from an hour that simply had no matches.
+    an absent hour apart from an hour that simply had no matches. Setting
+    ``stop`` from another thread makes the hour raise at its next downloaded
+    chunk, retry, backoff or archive line; a run's ``_RunStop`` also wakes a
+    read that is blocked on a stalled connection.
     """
     url = get_url_for_time(dt)
     results = []
-    tokens = prefilter_tokens(repos, event_types, orgs, actors)
-    # Convert filters to bytes if using orjson for speed.
+    groups = prefilter_groups(repos, event_types, orgs, actors)
+    # orjson parses bytes directly, so matching the tokens as bytes lets a
+    # rejected line skip UTF-8 decoding as well as parsing.
     if HAS_ORJSON:
-        fast_tokens = [t.encode('utf-8') for t in tokens]
-    else:
-        fast_tokens = tokens
+        groups = [[t.encode('utf-8') for t in tokens] for tokens in groups]
 
     session = _session_for_thread()
 
@@ -117,17 +229,25 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
     os.close(fd)
     
     download_success = False
+    # The retry policy's backoff sleep runs deep inside requests, so it finds
+    # this hour's stop signal through the worker thread instead.
+    _thread_local.stop = stop
 
     try:
         for attempt in range(10):
-            status = download_resumable(url, temp_path, session)
+            _raise_if_stopped(stop, url)
+            status = download_resumable(url, temp_path, session, stop)
             if status == DOWNLOAD_OK:
                 download_success = True
                 break
             if status == DOWNLOAD_MISSING:
                 logger.debug(f"No archive available at {url}")
                 return None
-            time.sleep(2)
+            _raise_if_stopped(stop, url)
+            if stop is not None:
+                stop.wait(2)
+            else:
+                time.sleep(2)
 
         if not download_success:
             # A persistent download failure is a real failure, not an empty
@@ -141,19 +261,15 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
         try:
             with gzip.open(temp_path, 'rb') as f:
                 for line in f:
+                    _raise_if_stopped(stop, url)
                     try:
-                        # OPTIMIZATION: Check tokens before full parse
-                        # orjson returns bytes, so we don't even need to decode to utf-8 yet
                         if HAS_ORJSON:
-                            if fast_tokens:
-                                # Simple byte-level check (very fast)
-                                if not any(t in line for t in fast_tokens):
-                                    continue
+                            if not passes_prefilter(line, groups):
+                                continue
                             event = orjson.loads(line)
                         else:
-                            # Standard Fallback
                             decoded = line.decode('utf-8')
-                            if fast_tokens and not fast_string_check(decoded, fast_tokens):
+                            if not passes_prefilter(decoded, groups):
                                 continue
                             event = json.loads(decoded)
 
@@ -162,6 +278,8 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                     except Exception:
                         # GHArchive occasionally has malformed lines; expected at low rates.
                         continue
+        except _HourStopped:
+            raise
         except Exception as e:
             # A gzip-level error means the download is truncated or corrupt, so
             # the events collected so far are an incomplete view of the hour.
@@ -172,6 +290,7 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
         return results
 
     finally:
+        _thread_local.stop = None
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -275,6 +394,39 @@ def _run_fingerprint(start, end, repos, event_types, orgs, actors):
     }
 
 
+def _sweep_hours(executor, run_hour, hours, depth, interval=0.5):
+    """Run hours on the executor and yield ``(hour, future)`` as each finishes.
+
+    Only ``depth`` hours are queued at a time, and the next one is submitted as
+    each finishes. Submitting a whole window up front made every wait below
+    rescan all of its queued futures, a cost that grew with the window (over a
+    third of a core for ten years of hours), and held them all in memory.
+
+    The wait wakes at least every ``interval`` seconds because otherwise it
+    blocks on a lock that Ctrl+C cannot break on Windows, so an interrupt would
+    only land when the next hour happened to finish. Waking up regularly
+    returns control to the interpreter, which raises KeyboardInterrupt at once.
+    """
+    hours = iter(hours)
+    pending = {}
+
+    def submit_next():
+        hour = next(hours, None)
+        if hour is not None:
+            pending[executor.submit(run_hour, hour)] = hour
+
+    for _ in range(depth):
+        submit_next()
+    while pending:
+        done, _ = concurrent.futures.wait(
+            pending, timeout=interval,
+            return_when=concurrent.futures.FIRST_COMPLETED,
+        )
+        for future in done:
+            submit_next()
+            yield pending.pop(future), future
+
+
 def _reconcile_jsonl_offset(output, committed_offset):
     """Line up a JSONL output with its resume checkpoint before appending.
 
@@ -359,11 +511,16 @@ def process_range(start, end, repos, event_types, output, workers,
     # `with` block's exit calls shutdown(wait=True), which drains the whole
     # queue instead. On a long run that means Ctrl+C would keep downloading
     # for a long time before stopping.
+    #
+    # Cancelling only covers hours still queued. The hours already running are
+    # told to give up through `stop`, because otherwise the final
+    # shutdown(wait=True) would sit until each in-flight download and parse
+    # finished on its own.
+    stop = _RunStop()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-    future_to_time = {
-        executor.submit(process_single_hour, ts, repos, event_types, orgs, actors): ts
-        for ts in todo
-    }
+
+    def run_hour(ts):
+        return process_single_hour(ts, repos, event_types, orgs, actors, stop=stop)
 
     try:
         with tqdm(
@@ -374,8 +531,7 @@ def process_range(start, end, repos, event_types, output, workers,
             dynamic_ncols=True,
         ) as pbar:
 
-            for future in concurrent.futures.as_completed(future_to_time):
-                ts = future_to_time[future]
+            for ts, future in _sweep_hours(executor, run_hour, todo, depth=workers * 2):
                 try:
                     data = future.result()
                     if data is None:
@@ -404,6 +560,7 @@ def process_range(start, end, repos, event_types, output, workers,
         # the pool. Any rows buffered for an hour that was not marked done are
         # dropped. KeyboardInterrupt is re-raised so an API caller sees the
         # normal interrupt; the CLI turns it into a non-zero exit.
+        stop.set()
         executor.shutdown(wait=False, cancel_futures=True)
         writer.buffer.clear()
         writer.close()

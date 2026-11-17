@@ -36,8 +36,11 @@ def passes_filters(event_dict: dict, repos: list = None, event_types: list = Non
     are separate groups that must also match when given. A group left as None is
     ignored (pass-through).
     """
+    # A nested object can be null as well as absent, especially in events
+    # built by hand rather than read from the archive, so `or {}` covers both
+    # shapes and a null repo or actor is a plain non-match.
     if repos or orgs:
-        repo_name = event_dict.get('repo', {}).get('name')
+        repo_name = (event_dict.get('repo') or {}).get('name')
         if not _repo_selected(repo_name, repos, orgs):
             return False
 
@@ -45,32 +48,42 @@ def passes_filters(event_dict: dict, repos: list = None, event_types: list = Non
         return False
 
     if actors:
-        actor_login = event_dict.get('actor', {}).get('login')
+        actor_login = (event_dict.get('actor') or {}).get('login')
         if actor_login not in actors:
             return False
 
     return True
 
 
-def prefilter_tokens(repos: list = None, event_types: list = None,
+def prefilter_groups(repos: list = None, event_types: list = None,
                      orgs: list = None, actors: list = None) -> list:
-    """Build the substrings used to skip lines before JSON parsing.
+    """Build the substring groups used to skip lines before JSON parsing.
 
-    A truly matching event always contains at least one of these tokens, so the
-    check is a superset test: it may admit a line the structured filter later
-    rejects, but it never drops a real match. With no filters the list is empty
-    and every line is parsed.
+    Returns one list of tokens per active filter group: repositories and owners
+    together (they are combined with OR), then event types, then actors. A truly
+    matching event contains at least one token from every group, so the check is
+    a superset test: it may admit a line the structured filter later rejects,
+    but it never drops a real match. With no filters the result is empty and
+    every line is parsed.
     """
-    tokens = []
-    for pattern in repos or []:
-        tokens.append(pattern[:-1] if pattern.endswith('/*') else pattern)
-    for owner in orgs or []:
-        tokens.append(owner + '/')
-    for event_type in event_types or []:
-        tokens.append(event_type)
-    for actor in actors or []:
-        tokens.append(actor)
-    return tokens
+    groups = []
+    repo_tokens = [p[:-1] if p.endswith('/*') else p for p in repos or []]
+    repo_tokens += [owner + '/' for owner in orgs or []]
+    for tokens in (repo_tokens, list(event_types or []), list(actors or [])):
+        if tokens:
+            groups.append(tokens)
+    return groups
+
+
+def passes_prefilter(line, groups: list) -> bool:
+    """Return True if the line contains a token from every group.
+
+    Works on ``str`` or ``bytes`` as long as the tokens are the same type.
+    Requiring every group, rather than any token at all, is what keeps a
+    combined filter selective: ``--repos apache/spark --event-types PushEvent``
+    would otherwise admit every PushEvent in the archive to the JSON parser.
+    """
+    return all(any(t in line for t in tokens) for tokens in groups)
 
 
 def fast_string_check(line: str, tokens: list) -> bool:
