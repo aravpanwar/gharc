@@ -1,4 +1,6 @@
 """Tests for download_resumable's HTTP status and resume handling."""
+import pytest
+
 from gharc.streamer import (
     download_resumable,
     DOWNLOAD_OK,
@@ -32,28 +34,15 @@ class _FakeSession:
         return self._response
 
 
-def test_416_reports_done(tmp_path):
-    temp = tmp_path / "f.gz"
-    session = _FakeSession(_FakeResponse(416))
-    assert download_resumable("http://x", str(temp), session) == DOWNLOAD_OK
-
-
-def test_404_reports_missing(tmp_path):
-    temp = tmp_path / "f.gz"
-    session = _FakeSession(_FakeResponse(404))
-    assert download_resumable("http://x", str(temp), session) == DOWNLOAD_MISSING
-
-
-def test_410_reports_missing(tmp_path):
-    temp = tmp_path / "f.gz"
-    session = _FakeSession(_FakeResponse(410))
-    assert download_resumable("http://x", str(temp), session) == DOWNLOAD_MISSING
-
-
-def test_500_reports_retry(tmp_path):
-    temp = tmp_path / "f.gz"
-    session = _FakeSession(_FakeResponse(500))
-    assert download_resumable("http://x", str(temp), session) == DOWNLOAD_RETRY
+@pytest.mark.parametrize("status, expected", [
+    (416, DOWNLOAD_OK),        # range past the end: the file is already whole
+    (404, DOWNLOAD_MISSING),
+    (410, DOWNLOAD_MISSING),
+    (500, DOWNLOAD_RETRY),
+])
+def test_status_codes_map_to_results(tmp_path, status, expected):
+    session = _FakeSession(_FakeResponse(status))
+    assert download_resumable("http://x", str(tmp_path / "f.gz"), session) == expected
 
 
 def test_200_writes_content(tmp_path):

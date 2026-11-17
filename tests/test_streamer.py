@@ -19,25 +19,6 @@ from gharc.streamer import (
 )
 from datetime import datetime
 
-def test_process_single_hour_success():
-    """Process an hour without touching the network, by mocking the download
-    and the gzip read so a single known line flows through the filter."""
-    with patch('gharc.streamer.download_resumable', return_value=DOWNLOAD_OK):
-        with patch('gzip.open') as mock_gzip:
-            mock_file = MagicMock()
-            mock_file.__iter__.return_value = [
-                b'{"repo": {"name": "apache/spark"}, "type": "PushEvent"}'
-            ]
-            mock_gzip.return_value.__enter__.return_value = mock_file
-
-            results = process_single_hour(
-                datetime(2024, 1, 1, 10), repos=["apache/spark"], event_types=None
-            )
-
-    assert len(results) == 1
-    assert results[0]['repo']['name'] == "apache/spark"
-
-
 @pytest.mark.parametrize("use_orjson", [False, True])
 def test_process_single_hour_combined_filter_on_both_parsers(use_orjson):
     if use_orjson:

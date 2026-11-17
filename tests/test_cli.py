@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from click.testing import CliRunner
 
 from gharc import __version__
@@ -17,27 +19,13 @@ def test_debug_flag_is_accepted():
     assert result.exit_code == 0
 
 
-def test_start_not_before_end_errors():
-    result = CliRunner().invoke(main, [
-        "download", "--start", "2024-01-02", "--end", "2024-01-01",
-        "--output", "x.jsonl",
-    ])
-    assert result.exit_code == 1
-
-
-def test_invalid_workers_errors():
-    result = CliRunner().invoke(main, [
-        "download", "--start", "2024-01-01", "--end", "2024-01-02",
-        "--workers", "0", "--output", "x.jsonl",
-    ])
-    assert result.exit_code == 1
-
-
-def test_future_start_errors():
-    result = CliRunner().invoke(main, [
-        "download", "--start", "2999-01-01", "--end", "2999-01-02",
-        "--output", "x.jsonl",
-    ])
+@pytest.mark.parametrize("extra", [
+    ["--start", "2024-01-02", "--end", "2024-01-01"],
+    ["--start", "2024-01-01", "--end", "2024-01-02", "--workers", "0"],
+    ["--start", "2999-01-01", "--end", "2999-01-02"],
+])
+def test_bad_download_arguments_exit_1(extra):
+    result = CliRunner().invoke(main, ["download", *extra, "--output", "x.jsonl"])
     assert result.exit_code == 1
 
 

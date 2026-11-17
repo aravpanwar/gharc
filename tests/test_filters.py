@@ -1,4 +1,3 @@
-import pytest
 from gharc.filters import (
     passes_filters,
     fast_string_check,

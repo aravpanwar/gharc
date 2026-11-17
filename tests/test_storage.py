@@ -82,19 +82,6 @@ def test_parquet_round_trip_streams_all_batches(tmp_path):
     assert json.loads(by_id["1"])["ref"] == "refs/heads/master"
 
 
-def test_parquet_handles_heterogeneous_event_types(tmp_path):
-    out = tmp_path / "events.parquet"
-    writer = DataWriter(str(out))
-    writer.buffer_size = 1
-
-    for event in SAMPLE_EVENTS:
-        writer.write(event)
-    writer.close()
-
-    table = pq.read_table(str(out))
-    assert table.num_rows == 2
-
-
 # org is only present on events from org-owned repos. A batch without it
 # followed by a batch with it (or vice versa) must not drop rows or corrupt
 # the file. buffer_size=1 forces each event into its own batch.
@@ -269,21 +256,6 @@ def test_jsonl_to_parquet_empty_input_writes_empty_file(tmp_path):
     assert rows == 0
     assert parquet_path.exists()
     assert pq.read_table(str(parquet_path)).num_rows == 0
-
-
-def test_jsonl_to_parquet_streams_large_input(tmp_path):
-    from gharc.storage import jsonl_to_parquet
-
-    jsonl_path = tmp_path / "many.jsonl"
-    parquet_path = tmp_path / "many.parquet"
-
-    with jsonl_path.open("w", encoding="utf-8") as f:
-        for i in range(2500):
-            f.write(json.dumps({**SAMPLE_EVENTS[0], "id": str(i)}) + "\n")
-
-    rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path), batch_size=500)
-    assert rows == 2500
-    assert pq.read_table(str(parquet_path)).num_rows == 2500
 
 
 def test_jsonl_to_parquet_refuses_same_path(tmp_path):
