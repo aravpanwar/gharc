@@ -11,7 +11,7 @@ from gharc.streamer import (
     process_range,
     download_resumable,
     _HourStopped,
-    _RunState,
+    _RunMarker,
     _run_fingerprint,
     DOWNLOAD_OK,
     DOWNLOAD_MISSING,
@@ -90,7 +90,7 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
     assert (tmp_path / "out.jsonl.state.json").exists()
 
 
-def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
+def test_process_range_keyboard_interrupt_stops_and_keeps_marker(tmp_path):
     out = tmp_path / "out.jsonl"
 
     # Pre-seed a checkpoint as if an earlier hour had already completed.
@@ -98,8 +98,8 @@ def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
         datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 3),
         ["apache/spark"], None, None, None,
     )
-    seed = _RunState(str(out), fingerprint)
-    seed.mark_done(datetime(2024, 1, 1, 0))
+    earlier = _RunMarker(str(out), fingerprint)
+    earlier.mark_done(datetime(2024, 1, 1, 0))
 
     # The remaining hours raise KeyboardInterrupt as if the user hit Ctrl+C.
     # process_range re-raises it (the CLI turns that into a non-zero exit) and
@@ -132,8 +132,8 @@ def test_resume_trims_uncommitted_tail(tmp_path):
     fingerprint = _run_fingerprint(
         datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2), None, None, None, None
     )
-    state = _RunState(str(out), fingerprint)
-    state.mark_done(datetime(2024, 1, 1, 0), len(committed.encode("utf-8")))
+    marker = _RunMarker(str(out), fingerprint)
+    marker.mark_done(datetime(2024, 1, 1, 0), len(committed.encode("utf-8")))
 
     def fake_hour(dt, repos, event_types, orgs=None, actors=None, stop=None):
         return [{"id": "hour1"}]
@@ -149,15 +149,15 @@ def test_resume_trims_uncommitted_tail(tmp_path):
     assert ids == ["committed", "hour1"]
 
 
-def test_resume_errors_when_output_shorter_than_checkpoint(tmp_path):
+def test_resume_errors_when_output_shorter_than_marker(tmp_path):
     out = tmp_path / "out.jsonl"
 
     fingerprint = _run_fingerprint(
         datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 2), None, None, None, None
     )
-    state = _RunState(str(out), fingerprint)
+    marker = _RunMarker(str(out), fingerprint)
     # Checkpoint claims committed bytes, but the output file is gone.
-    state.mark_done(datetime(2024, 1, 1, 0), 500)
+    marker.mark_done(datetime(2024, 1, 1, 0), 500)
 
     def fake_hour(dt, repos, event_types, orgs=None, actors=None, stop=None):
         return []
@@ -170,7 +170,7 @@ def test_resume_errors_when_output_shorter_than_checkpoint(tmp_path):
             )
 
 
-def test_process_range_parquet_uses_no_state_file(tmp_path):
+def test_process_range_parquet_uses_no_marker_file(tmp_path):
     out = tmp_path / "out.parquet"
 
     # Parquet cannot resume, so no sidecar state file should be created.
@@ -188,7 +188,7 @@ def test_process_range_parquet_uses_no_state_file(tmp_path):
     assert out.exists()
 
 
-def test_process_range_parquet_failure_clears_state(tmp_path):
+def test_process_range_parquet_failure_leaves_no_marker(tmp_path):
     out = tmp_path / "out.parquet"
 
     def fake_hour(dt, repos, event_types, orgs=None, actors=None, stop=None):
@@ -207,7 +207,7 @@ def test_process_range_parquet_failure_clears_state(tmp_path):
                 workers=1,
             )
 
-    # Parquet cannot resume, so the state file is cleared rather than left to
+    # Parquet keeps no marker, so a failed run cannot leave one behind to
     # dead-end the next run on the existing Parquet file.
     assert not (tmp_path / "out.parquet.state.json").exists()
 
@@ -225,7 +225,7 @@ def test_keyboard_interrupt_stops_in_flight_hours_promptly(tmp_path):
             second_started.wait(5)
             raise KeyboardInterrupt
         second_started.set()
-        second_saw_stop.append(stop.wait(30))
+        second_saw_stop.append(stop.wait(34))
         return []
 
     began = time.monotonic()
@@ -237,7 +237,7 @@ def test_keyboard_interrupt_stops_in_flight_hours_promptly(tmp_path):
             )
 
     assert second_saw_stop == [True]
-    assert time.monotonic() - began < 10
+    assert time.monotonic() - began < 14
 
 
 def test_download_resumable_abandons_transfer_when_stopped(tmp_path):

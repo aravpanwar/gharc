@@ -1,4 +1,3 @@
-# src/gharc/streamer.py
 import requests
 import gzip
 import json
@@ -74,6 +73,8 @@ def _session_for_thread() -> requests.Session:
 DOWNLOAD_OK = "ok"
 DOWNLOAD_MISSING = "missing"
 DOWNLOAD_RETRY = "retry"
+
+DOWNLOAD_ATTEMPTS = 14
 
 
 class _HourStopped(RuntimeError):
@@ -174,7 +175,7 @@ def download_resumable(url: str, temp_path: str, session: requests.Session,
                 tqdm.write(f"   Resuming from {current_size/(1024*1024):.1f} MB")
 
     try:
-        with session.get(url, headers=resume_header, stream=True, timeout=(30, 120)) as r:
+        with session.get(url, headers=resume_header, stream=True, timeout=(34, 134)) as r:
             watched = stop.watch(r) if isinstance(stop, _RunStop) else None
             try:
                 if r.status_code == 416: # Range not satisfiable (file done)
@@ -203,6 +204,40 @@ def download_resumable(url: str, temp_path: str, session: requests.Session,
         logger.debug(f"Download attempt failed for {url}: {e}")
         return DOWNLOAD_RETRY
 
+def _sweep_archive(path, url, groups, repos, event_types, orgs, actors, stop):
+    """Read one downloaded hour and return the events that pass the filters."""
+    results = []
+    try:
+        with gzip.open(path, 'rb') as f:
+            for line in f:
+                _raise_if_stopped(stop, url)
+                try:
+                    if HAS_ORJSON:
+                        if not passes_prefilter(line, groups):
+                            continue
+                        event = orjson.loads(line)
+                    else:
+                        decoded = line.decode('utf-8')
+                        if not passes_prefilter(decoded, groups):
+                            continue
+                        event = json.loads(decoded)
+
+                    if passes_filters(event, repos, event_types, orgs, actors):
+                        results.append(event)
+                except Exception:
+                    # GHArchive occasionally has malformed lines; expected at low rates.
+                    continue
+    except _HourStopped:
+        raise
+    except Exception as e:
+        # A gzip-level error means the download is truncated or corrupt, so
+        # the events collected so far are an incomplete view of the hour.
+        # Raise rather than return a partial result, so the hour is retried
+        # on resume instead of being recorded as complete.
+        raise RuntimeError(f"couldn't read archive {url}: {e}") from e
+    return results
+
+
 def process_single_hour(dt: datetime, repos: list, event_types: list,
                         orgs: list = None, actors: list = None,
                         stop: threading.Event = None):
@@ -216,7 +251,6 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
     read that is blocked on a stalled connection.
     """
     url = get_url_for_time(dt)
-    results = []
     groups = prefilter_groups(repos, event_types, orgs, actors)
     # orjson parses bytes directly, so matching the tokens as bytes lets a
     # rejected line skip UTF-8 decoding as well as parsing.
@@ -224,21 +258,17 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
         groups = [[t.encode('utf-8') for t in tokens] for tokens in groups]
 
     session = _session_for_thread()
-
     fd, temp_path = tempfile.mkstemp(suffix=".json.gz")
     os.close(fd)
-    
-    download_success = False
     # The retry policy's backoff sleep runs deep inside requests, so it finds
     # this hour's stop signal through the worker thread instead.
     _thread_local.stop = stop
 
     try:
-        for attempt in range(10):
+        for _ in range(DOWNLOAD_ATTEMPTS):
             _raise_if_stopped(stop, url)
             status = download_resumable(url, temp_path, session, stop)
             if status == DOWNLOAD_OK:
-                download_success = True
                 break
             if status == DOWNLOAD_MISSING:
                 logger.debug(f"No archive available at {url}")
@@ -248,53 +278,24 @@ def process_single_hour(dt: datetime, repos: list, event_types: list,
                 stop.wait(2)
             else:
                 time.sleep(2)
-
-        if not download_success:
+        else:
             # A persistent download failure is a real failure, not an empty
             # hour. Raise so the run reports it and (for JSONL output) retries
             # this hour on resume, rather than silently dropping it.
             raise RuntimeError(
-                f"failed to download {url} after 10 attempts "
+                f"failed to download {url} after {DOWNLOAD_ATTEMPTS} attempts "
                 f"(run with --debug for details)"
             )
 
-        try:
-            with gzip.open(temp_path, 'rb') as f:
-                for line in f:
-                    _raise_if_stopped(stop, url)
-                    try:
-                        if HAS_ORJSON:
-                            if not passes_prefilter(line, groups):
-                                continue
-                            event = orjson.loads(line)
-                        else:
-                            decoded = line.decode('utf-8')
-                            if not passes_prefilter(decoded, groups):
-                                continue
-                            event = json.loads(decoded)
-
-                        if passes_filters(event, repos, event_types, orgs, actors):
-                            results.append(event)
-                    except Exception:
-                        # GHArchive occasionally has malformed lines; expected at low rates.
-                        continue
-        except _HourStopped:
-            raise
-        except Exception as e:
-            # A gzip-level error means the download is truncated or corrupt, so
-            # the events collected so far are an incomplete view of the hour.
-            # Raise rather than return a partial result, so the hour is retried
-            # on resume instead of being recorded as complete.
-            raise RuntimeError(f"couldn't read archive {url}: {e}") from e
-
-        return results
-
+        return _sweep_archive(temp_path, url, groups, repos, event_types,
+                              orgs, actors, stop)
     finally:
         _thread_local.stop = None
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-class _RunState:
+
+class _RunMarker:
     """Tracks which hours have been completed so a crashed run can resume.
 
     State lives next to the output file as <output>.state.json. The fingerprint
@@ -310,7 +311,7 @@ class _RunState:
         # Byte length of the JSONL output at the last completed hour. Rows
         # written past this offset belong to an hour that was interrupted
         # before it was marked done, so a resume trims back to here.
-        self._committed_offset = 0
+        self._marker_offset = 0
         if os.path.exists(self._path):
             try:
                 with open(self._path, "r", encoding="utf-8") as f:
@@ -324,21 +325,21 @@ class _RunState:
                     f"(window or filters changed); remove it or use a new --output"
                 )
             self._done = set(payload.get("done_hours", []))
-            self._committed_offset = payload.get("committed_offset", 0)
+            self._marker_offset = payload.get("committed_offset", 0)
 
     def __len__(self):
         return len(self._done)
 
     @property
-    def committed_offset(self):
-        return self._committed_offset
+    def marker_offset(self):
+        return self._marker_offset
 
     def is_done(self, ts):
         return ts.isoformat() in self._done
 
     def mark_done(self, ts, offset=0):
         self._done.add(ts.isoformat())
-        self._committed_offset = offset
+        self._marker_offset = offset
         # Write to a temporary file and rename it into place so a crash mid-write
         # cannot truncate the existing state and lose all completed hours. Called
         # only from the main thread, so there is no concurrent writer.
@@ -348,7 +349,7 @@ class _RunState:
                 {
                     "fingerprint": self._fingerprint,
                     "done_hours": sorted(self._done),
-                    "committed_offset": self._committed_offset,
+                    "committed_offset": self._marker_offset,
                 },
                 f,
             )
@@ -359,7 +360,7 @@ class _RunState:
             os.remove(self._path)
 
 
-class _NoState:
+class _NoMarker:
     """No-op resume state used for Parquet output.
 
     A closed Parquet file cannot be appended to, so a Parquet run can never be
@@ -368,7 +369,7 @@ class _NoState:
     Parquet runs use this no-op instead.
     """
 
-    committed_offset = 0
+    marker_offset = 0
 
     def __len__(self):
         return 0
@@ -427,24 +428,24 @@ def _sweep_hours(executor, run_hour, hours, depth, interval=0.5):
             yield pending.pop(future), future
 
 
-def _reconcile_jsonl_offset(output, committed_offset):
+def _reconcile_jsonl_marker(output, marker_offset):
     """Line up a JSONL output with its resume checkpoint before appending.
 
-    Rows past ``committed_offset`` belong to an hour that was interrupted
+    Rows past ``marker_offset`` belong to an hour that was interrupted
     before it was marked done, so they are trimmed to keep resume exactly-once.
     An output shorter than the checkpoint means it was truncated or deleted, so
     the checkpoint can no longer be trusted and the run stops with an error.
     """
     size = os.path.getsize(output) if os.path.exists(output) else 0
-    if size < committed_offset:
+    if size < marker_offset:
         raise ValueError(
             f"output {output} is shorter than its resume checkpoint "
-            f"({size} < {committed_offset} bytes); it looks truncated or "
+            f"({size} < {marker_offset} bytes); it looks truncated or "
             f"deleted, so remove {output}.state.json to start the window over"
         )
-    if size > committed_offset:
+    if size > marker_offset:
         with open(output, "r+b") as f:
-            f.truncate(committed_offset)
+            f.truncate(marker_offset)
 
 
 def process_range(start, end, repos, event_types, output, workers,
@@ -452,16 +453,16 @@ def process_range(start, end, repos, event_types, output, workers,
     """Stream-and-filter GHArchive over [start, end) and write matching events.
 
     Hours in the range are dispatched to a thread pool. Each worker downloads
-    the corresponding GHArchive file, applies the repo and event-type filters,
-    and returns matching events. The main thread writes them through a
-    DataWriter (Parquet via streaming append, or JSONL).
+    the corresponding GHArchive file, applies the filters, and returns
+    matching events. The main thread writes them through a DataWriter
+    (Parquet via streaming append, or JSONL).
 
-    Crash safety: a `<output>.state.json` file records which hours have
-    finished. Restarting the same command picks up where it left off. The
-    state file is removed on clean completion. Resume into an existing
-    Parquet output is rejected because Parquet writers cannot append to a
-    closed file; use JSONL for runs that may need to be resumed and convert
-    afterwards with ``gharc convert``.
+    Crash safety: for JSONL output a `<output>.state.json` file records which
+    hours have finished, so restarting the same command picks up where it left
+    off. The state file is removed on clean completion. Parquet writers cannot
+    append to a closed file, so Parquet output keeps no state file and a rerun
+    starts the window over, replacing the earlier file. Use JSONL for runs that
+    may need to be resumed and convert afterwards with ``gharc convert``.
 
     Args:
         start: Inclusive start datetime (rounded to the hour).
@@ -485,16 +486,16 @@ def process_range(start, end, repos, event_types, output, workers,
     # Parquet cannot be appended to, so it can never be resumed; skip state
     # tracking for it rather than write a sidecar file no rerun could use.
     if str(output).endswith(".parquet"):
-        state = _NoState()
+        marker = _NoMarker()
     else:
-        state = _RunState(output, fingerprint)
+        marker = _RunMarker(output, fingerprint)
 
-    resuming = len(state) > 0
+    resuming = len(marker) > 0
     writer = DataWriter(output, append=resuming)
     if resuming and not writer.is_parquet:
-        _reconcile_jsonl_offset(output, state.committed_offset)
+        _reconcile_jsonl_marker(output, marker.marker_offset)
     all_timestamps = list(date_range(start, end))
-    todo = [t for t in all_timestamps if not state.is_done(t)]
+    todo = [t for t in all_timestamps if not marker.is_done(t)]
     skipped = len(all_timestamps) - len(todo)
     if skipped:
         logger.info(f"Resuming: skipping {skipped} hours already in state file")
@@ -540,26 +541,22 @@ def process_range(start, end, repos, event_types, output, workers,
                     elif data:
                         for record in data:
                             writer.write(record)
-                    # Flush the hour's events before marking it done. For JSONL
-                    # this makes the appended lines durable so a restart can skip
-                    # the hour and trust what is on disk. For Parquet the row
-                    # group is only readable after close(), so Parquet uses no
-                    # resume state (see _NoState). The committed byte offset is
-                    # recorded with the hour so a resume can trim a partially
-                    # written hour and stay exactly-once.
+                    # Flush the hour's events before marking it done, so a
+                    # restart can skip the hour and trust what is on disk. The
+                    # byte offset is recorded with the hour so a resume can trim
+                    # a partially written hour and stay exactly-once.
                     writer.flush()
                     offset = os.path.getsize(output) if os.path.exists(output) else 0
-                    state.mark_done(ts, offset)
+                    marker.mark_done(ts, offset)
                 except Exception as exc:
                     failed.append(ts)
                     tqdm.write(f"Worker exception for {ts}: {exc}")
                 finally:
                     pbar.update(1)
     except KeyboardInterrupt:
-        # Cancel the hours still queued so we stop soon rather than draining
-        # the pool. Any rows buffered for an hour that was not marked done are
-        # dropped. KeyboardInterrupt is re-raised so an API caller sees the
-        # normal interrupt; the CLI turns it into a non-zero exit.
+        # Rows buffered for an hour that was not marked done are dropped.
+        # KeyboardInterrupt is re-raised so an API caller sees the normal
+        # interrupt; the CLI turns it into a non-zero exit.
         stop.set()
         executor.shutdown(wait=False, cancel_futures=True)
         writer.buffer.clear()
@@ -585,12 +582,9 @@ def process_range(start, end, repos, event_types, output, workers,
 
     if failed:
         # Signal the failure rather than reporting a clean finish over partial
-        # output. For JSONL we keep the state file so a rerun retries only the
-        # failed hours. Parquet cannot be appended to, so a kept state file
-        # would only make the rerun dead-end on the existing file; clear it so
-        # the rerun starts the window over cleanly.
+        # output. JSONL keeps its marker so a rerun retries only the failed
+        # hours; Parquet never had one, so its rerun starts the window over.
         if writer.is_parquet:
-            state.clear()
             hint = (
                 "rerun to start the window over, or use JSONL output to retry "
                 "only the failed hours"
@@ -602,5 +596,5 @@ def process_range(start, end, repos, event_types, output, workers,
             f"incomplete; {hint}"
         )
 
-    state.clear()
+    marker.clear()
     logger.info(f"Done! Data written to {output}")

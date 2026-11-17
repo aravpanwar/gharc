@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 import pytest
-from gharc.streamer import _RunState, _run_fingerprint
+from gharc.streamer import _RunMarker, _run_fingerprint
 
 
 def make_fp():
@@ -19,39 +19,39 @@ def test_mark_done_persists_across_instances(tmp_path):
     out = tmp_path / "events.jsonl"
     fp = make_fp()
 
-    state1 = _RunState(str(out), fp)
-    state1.mark_done(datetime(2024, 1, 1, 5))
-    state1.mark_done(datetime(2024, 1, 1, 6))
+    marker1 = _RunMarker(str(out), fp)
+    marker1.mark_done(datetime(2024, 1, 1, 5))
+    marker1.mark_done(datetime(2024, 1, 1, 6))
 
-    state2 = _RunState(str(out), fp)
-    assert state2.is_done(datetime(2024, 1, 1, 5))
-    assert state2.is_done(datetime(2024, 1, 1, 6))
-    assert not state2.is_done(datetime(2024, 1, 1, 7))
+    marker2 = _RunMarker(str(out), fp)
+    assert marker2.is_done(datetime(2024, 1, 1, 5))
+    assert marker2.is_done(datetime(2024, 1, 1, 6))
+    assert not marker2.is_done(datetime(2024, 1, 1, 7))
 
 
 def test_fingerprint_mismatch_raises(tmp_path):
     out = tmp_path / "events.jsonl"
 
-    state = _RunState(str(out), make_fp())
-    state.mark_done(datetime(2024, 1, 1, 0))
+    marker = _RunMarker(str(out), make_fp())
+    marker.mark_done(datetime(2024, 1, 1, 0))
 
     different_fp = _run_fingerprint(
         datetime(2024, 1, 1),
         datetime(2024, 1, 2),
-        ["pandas-dev/pandas"],  # different repos
+        ["pandas-dev/pandas"],
         None,
         None,
         None,
     )
 
     with pytest.raises(ValueError, match="different run"):
-        _RunState(str(out), different_fp)
+        _RunMarker(str(out), different_fp)
 
 
 def test_mark_done_writes_atomically_leaving_no_temp(tmp_path):
     out = tmp_path / "events.jsonl"
-    state = _RunState(str(out), make_fp())
-    state.mark_done(datetime(2024, 1, 1, 0))
+    marker = _RunMarker(str(out), make_fp())
+    marker.mark_done(datetime(2024, 1, 1, 0))
 
     # The state file is valid JSON and no temporary file is left behind.
     state_file = tmp_path / "events.jsonl.state.json"
@@ -60,21 +60,21 @@ def test_mark_done_writes_atomically_leaving_no_temp(tmp_path):
     json.loads(state_file.read_text(encoding="utf-8"))
 
 
-def test_clear_removes_state_file(tmp_path):
+def test_clear_removes_marker_file(tmp_path):
     out = tmp_path / "events.jsonl"
-    state = _RunState(str(out), make_fp())
-    state.mark_done(datetime(2024, 1, 1, 0))
+    marker = _RunMarker(str(out), make_fp())
+    marker.mark_done(datetime(2024, 1, 1, 0))
 
-    state.clear()
+    marker.clear()
 
     state_file = tmp_path / "events.jsonl.state.json"
     assert not state_file.exists()
 
 
-def test_unreadable_state_file_starts_fresh(tmp_path):
+def test_unreadable_marker_file_starts_fresh(tmp_path):
     out = tmp_path / "events.jsonl"
     state_file = tmp_path / "events.jsonl.state.json"
     state_file.write_text("{not valid json")
 
-    state = _RunState(str(out), make_fp())
-    assert not state.is_done(datetime(2024, 1, 1, 0))
+    marker = _RunMarker(str(out), make_fp())
+    assert not marker.is_done(datetime(2024, 1, 1, 0))

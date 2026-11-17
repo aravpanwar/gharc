@@ -5,31 +5,26 @@ from gharc.filters import (
     passes_prefilter,
 )
 
+
 def test_fast_string_check():
-    # Should return True if ANY token is present
     line = '{"repo": {"name": "apache/spark"}, "type": "PushEvent"}'
     assert fast_string_check(line, ["apache/spark"]) is True
     assert fast_string_check(line, ["pandas-dev/pandas", "apache/spark"]) is True
-    
-    # Should return False if NO tokens are present
     assert fast_string_check(line, ["kubernetes/kubernetes"]) is False
+
 
 def test_passes_filters_repo():
     event = {"repo": {"name": "apache/spark"}, "type": "PushEvent"}
-    
-    # Match
+
     assert passes_filters(event, repos=["apache/spark"]) is True
-    # No Match
     assert passes_filters(event, repos=["pandas/pandas"]) is False
-    # No Filter (Pass through)
     assert passes_filters(event, repos=None) is True
+
 
 def test_passes_filters_type():
     event = {"repo": {"name": "apache/spark"}, "type": "PushEvent"}
 
-    # Match
     assert passes_filters(event, event_types=["PushEvent"]) is True
-    # No Match
     assert passes_filters(event, event_types=["PullRequestEvent"]) is False
 
 
@@ -60,10 +55,10 @@ def test_passes_filters_actors():
     event = {
         "repo": {"name": "apache/spark"},
         "type": "PushEvent",
-        "actor": {"login": "dongjoon-hyun"},
+        "actor": {"login": "gustav-victor"},
     }
 
-    assert passes_filters(event, actors=["dongjoon-hyun"]) is True
+    assert passes_filters(event, actors=["gustav-victor"]) is True
     assert passes_filters(event, actors=["someone-else"]) is False
 
 
@@ -71,7 +66,7 @@ def test_passes_filters_groups_are_anded():
     event = {
         "repo": {"name": "apache/spark"},
         "type": "PushEvent",
-        "actor": {"login": "dongjoon-hyun"},
+        "actor": {"login": "gustav-victor"},
     }
 
     # Repo matches but the type does not, so the event is rejected.

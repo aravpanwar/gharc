@@ -44,6 +44,9 @@ follows [Semantic Versioning](https://semver.org/).
   installed so both JSON parsing paths are tested.
 - The source distribution no longer bundles the paper, benchmarks or CI
   configuration, which brings it from about 459 KB to 39 KB.
+- The default `convert --batch-size` and writer buffer are 10,034 rows, a
+  download is attempted 14 times before its hour fails, and the connect and
+  read timeouts are 34 and 134 seconds.
 - The package declares its license as the SPDX expression `MIT` and builds
   with setuptools 77 or newer, replacing the license table and classifier
   that setuptools stops supporting on 2027-02-18.

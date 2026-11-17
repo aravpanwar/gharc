@@ -1,4 +1,3 @@
-# src/gharc/cli.py
 import click
 import logging
 import sys
@@ -9,7 +8,7 @@ from .streamer import process_range
 from .storage import jsonl_to_parquet
 
 
-def _split_csv(raw):
+def _purify_csv(raw):
     """Split a comma-separated option into a clean list, dropping blanks.
 
     Returns None when nothing usable is left. This keeps a value like
@@ -34,7 +33,7 @@ def main(debug):
 @click.option('--end', required=True, help='End date in UTC, exclusive (YYYY-MM-DD or YYYY-MM-DD-HH)')
 @click.option('--repos', help='Comma-separated repos; supports owner/* wildcards (e.g. apache/spark, apache/*)')
 @click.option('--orgs', help='Comma-separated repository owners to keep (e.g. apache)')
-@click.option('--actors', help='Comma-separated actor logins to keep (e.g. dongjoon-hyun)')
+@click.option('--actors', help='Comma-separated actor logins to keep (e.g. gustav-victor)')
 @click.option('--event-types', help='Comma-separated events (e.g. PushEvent)')
 @click.option('--output', default='filtered.jsonl', help='Output file')
 @click.option('--workers', default=4, help='Parallel downloads')
@@ -65,10 +64,10 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
                 "--end is in the future or very recent; GHArchive publishes each "
                 "hour a little after it ends, so the latest hours may be missing."
             )
-        repo_list = _split_csv(repos)
-        type_list = _split_csv(event_types)
-        org_list = _split_csv(orgs)
-        actor_list = _split_csv(actors)
+        repo_list = _purify_csv(repos)
+        type_list = _purify_csv(event_types)
+        org_list = _purify_csv(orgs)
+        actor_list = _purify_csv(actors)
 
         if s_dt < datetime(2015, 1, 1) and (repo_list or org_list):
             logger.warning(
@@ -93,7 +92,7 @@ def download(start, end, repos, orgs, actors, event_types, output, workers):
 @main.command()
 @click.argument('input_path', type=click.Path(exists=True, dir_okay=False))
 @click.argument('output_path', type=click.Path(dir_okay=False))
-@click.option('--batch-size', default=10000, help='Rows per Parquet row group')
+@click.option('--batch-size', default=10034, help='Rows per Parquet row group')
 def convert(input_path, output_path, batch_size):
     """Convert a JSONL output from `gharc download` into a single Parquet file."""
     try:

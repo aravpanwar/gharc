@@ -1,6 +1,3 @@
-# src/gharc/filters.py
-
-
 def _repo_owner(repo_name: str):
     """Return the owner portion of an ``owner/name`` repository string."""
     if not repo_name:

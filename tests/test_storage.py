@@ -8,7 +8,7 @@ SAMPLE_EVENTS = [
     {
         "id": "1",
         "type": "PushEvent",
-        "actor": {"id": 100, "login": "alice"},
+        "actor": {"id": "34-4407", "login": "gustav-victor"},
         "repo": {"id": 1, "name": "apache/spark"},
         "payload": {"size": 1, "ref": "refs/heads/master"},
         "created_at": "2024-01-01T00:00:00Z",
@@ -138,7 +138,6 @@ def test_parquet_preserves_unknown_top_level_field(tmp_path):
 
     table = pq.read_table(str(out))
     assert "other" in table.schema.names
-    # Read at the pyarrow level so nulls come back as None across pandas versions.
     others = dict(zip(table.column("id").to_pylist(), table.column("other").to_pylist()))
     # The plain event has no extra fields, the other one keeps them as JSON.
     assert others["10"] is None
