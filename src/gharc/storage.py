@@ -1,4 +1,3 @@
-# src/gharc/storage.py
 import json
 import os
 import tempfile

@@ -1,4 +1,3 @@
-# src/gharc/streamer.py
 import requests
 import gzip
 import json
@@ -75,7 +74,6 @@ DOWNLOAD_OK = "ok"
 DOWNLOAD_MISSING = "missing"
 DOWNLOAD_RETRY = "retry"
 
-# How many times one hour's download is attempted before the hour fails.
 DOWNLOAD_ATTEMPTS = 14
 
 

@@ -1,4 +1,3 @@
-# src/gharc/cli.py
 import click
 import logging
 import sys
