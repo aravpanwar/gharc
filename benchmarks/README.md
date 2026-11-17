@@ -1,7 +1,7 @@
 # Benchmarks
 
 Reproducible runs that back up the performance and correctness claims in
-`paper/paper.md`.
+the project README.
 
 Each script writes results to `benchmarks/results/` (gitignored) so the raw
 data downloads don't bloat the repo.

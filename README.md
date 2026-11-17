@@ -25,7 +25,7 @@ The full GitHub Archive spans every public event since 2011: tens of terabytes c
 
 It is meant for researchers and students who need event-level GitHub data over long windows but do not have a warehouse account or the disk to hold raw months.
 
-![Architecture: GHArchive HTTPS to thread pool to resumable download to temp file to streaming decode and filter to DataWriter to output file.](paper/figures/architecture.png)
+![Architecture: GHArchive HTTPS to thread pool to resumable download to temp file to streaming decode and filter to DataWriter to output file.](docs/architecture.png)
 
 ---
 
@@ -209,7 +209,7 @@ gharc/
 ├── tests/            # pytest test suite
 ├── benchmarks/       # Reproducible runs that back the performance claims
 ├── examples/         # Driver scripts (e.g. month-by-month orchestrator)
-├── paper/            # paper.md, paper.bib, figures (the JOSS submission)
+├── docs/             # Architecture figure and its Mermaid source
 └── CITATION.cff      # GitHub-detectable citation metadata
 ```
 
@@ -229,8 +229,6 @@ pytest tests/
 ---
 
 ## Citation
-
-The accompanying paper is at [`paper/paper.pdf`](paper/paper.pdf) and is rebuilt automatically on every push by the [Paper CI workflow](.github/workflows/paper.yml).
 
 If you use `gharc` in your research, please cite it using the metadata in `CITATION.cff` or as follows:
 

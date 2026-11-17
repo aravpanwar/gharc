@@ -3,6 +3,6 @@ include LICENSE
 include CITATION.cff
 recursive-include examples *.py
 recursive-include tests *.py
-prune paper
+prune docs
 prune benchmarks
 prune .github
