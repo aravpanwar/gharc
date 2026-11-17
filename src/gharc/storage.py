@@ -170,9 +170,16 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
     written. Designed to handle multi-GB inputs without loading the whole file
     into memory.
     """
-    if os.path.exists(output_path):
-        os.remove(output_path)
+    if batch_size < 1:
+        raise ValueError(f"expected a batch size of at least 1, got {batch_size}")
+    if os.path.exists(output_path) and os.path.samefile(input_path, output_path):
+        raise ValueError(f"refusing to convert {input_path} onto itself")
 
+    # Build the Parquet file beside the destination and rename it into place
+    # only once it is complete, so a conversion that fails partway (a full
+    # disk, an interrupt) leaves any earlier output untouched instead of
+    # having already deleted it.
+    tmp_path = output_path + ".tmp"
     writer = None
     buffer = []
     rows_written = 0
@@ -184,7 +191,7 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
         table = _events_to_table(buffer)
         if writer is None:
             writer = pq.ParquetWriter(
-                output_path,
+                tmp_path,
                 schema=EVENT_SCHEMA,
                 compression='snappy',
             )
@@ -209,14 +216,21 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
         if buffer:
             flush()
             rows_written += len(buffer)
-    finally:
+
+        if writer is None:
+            # Input had no usable rows. Still emit a valid empty Parquet file
+            # so the output exists and reads back as a 0-row table.
+            pq.write_table(EVENT_SCHEMA.empty_table(), tmp_path, compression='snappy')
+    except BaseException:
         if writer is not None:
             writer.close()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
 
-    if writer is None:
-        # Input had no usable rows. Still emit a valid empty Parquet file so
-        # the output exists and reads back as a 0-row table.
-        pq.write_table(EVENT_SCHEMA.empty_table(), output_path, compression='snappy')
+    if writer is not None:
+        writer.close()
+    os.replace(tmp_path, output_path)
 
     logger.info(f"Converted {rows_written:,} rows from {input_path} to {output_path}")
     return rows_written

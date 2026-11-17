@@ -284,3 +284,45 @@ def test_jsonl_to_parquet_streams_large_input(tmp_path):
     rows = jsonl_to_parquet(str(jsonl_path), str(parquet_path), batch_size=500)
     assert rows == 2500
     assert pq.read_table(str(parquet_path)).num_rows == 2500
+
+
+def test_jsonl_to_parquet_refuses_same_path(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    path = tmp_path / "events.jsonl"
+    path.write_text(json.dumps(SAMPLE_EVENTS[0]) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="onto itself"):
+        jsonl_to_parquet(str(path), str(path))
+    # The input must survive the refused conversion.
+    assert json.loads(path.read_text(encoding="utf-8"))["id"] == "1"
+
+
+def test_jsonl_to_parquet_failure_keeps_previous_output(tmp_path, monkeypatch):
+    from gharc import storage
+
+    jsonl_path = tmp_path / "events.jsonl"
+    parquet_path = tmp_path / "events.parquet"
+    jsonl_path.write_text(json.dumps(SAMPLE_EVENTS[0]) + "\n", encoding="utf-8")
+    storage.jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+    before = parquet_path.read_bytes()
+
+    def boom(_events):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(storage, "_events_to_table", boom)
+    with pytest.raises(OSError, match="disk full"):
+        storage.jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+
+    assert parquet_path.read_bytes() == before
+    assert not (tmp_path / "events.parquet.tmp").exists()
+
+
+def test_jsonl_to_parquet_rejects_non_positive_batch_size(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    jsonl_path = tmp_path / "events.jsonl"
+    jsonl_path.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="at least 1"):
+        jsonl_to_parquet(str(jsonl_path), str(tmp_path / "out.parquet"), batch_size=0)
