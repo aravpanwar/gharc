@@ -94,10 +94,15 @@ def test_stop_wakes_a_download_stalled_mid_transfer(serve, tmp_path, protocol):
     thread, outcome = _run_in_thread(
         lambda: download_resumable(url, str(temp), get_robust_session(), stop)
     )
+    # Wait for the download to register its socket with the stop signal, then
+    # give it a moment to drain the data and block. The file size is no use as
+    # a signal: Python 3.14's larger write buffer keeps the first chunk in
+    # memory, so the file stays empty on disk.
     deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and not (temp.exists() and temp.stat().st_size):
+    while time.monotonic() < deadline and not stop._sockets:
         time.sleep(0.02)
-    assert temp.stat().st_size > 0, "the download never started"
+    assert stop._sockets, "the download never started"
+    time.sleep(0.3)
 
     stopped_at = time.monotonic()
     stop.set()
