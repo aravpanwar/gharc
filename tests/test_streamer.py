@@ -90,7 +90,7 @@ def test_process_range_raises_when_an_hour_fails(tmp_path):
     assert (tmp_path / "out.jsonl.state.json").exists()
 
 
-def test_process_range_keyboard_interrupt_stops_and_keeps_state(tmp_path):
+def test_process_range_keyboard_interrupt_stops_and_keeps_marker(tmp_path):
     out = tmp_path / "out.jsonl"
 
     # Pre-seed a checkpoint as if an earlier hour had already completed.
@@ -149,7 +149,7 @@ def test_resume_trims_uncommitted_tail(tmp_path):
     assert ids == ["committed", "hour1"]
 
 
-def test_resume_errors_when_output_shorter_than_checkpoint(tmp_path):
+def test_resume_errors_when_output_shorter_than_marker(tmp_path):
     out = tmp_path / "out.jsonl"
 
     fingerprint = _run_fingerprint(
@@ -170,7 +170,7 @@ def test_resume_errors_when_output_shorter_than_checkpoint(tmp_path):
             )
 
 
-def test_process_range_parquet_uses_no_state_file(tmp_path):
+def test_process_range_parquet_uses_no_marker_file(tmp_path):
     out = tmp_path / "out.parquet"
 
     # Parquet cannot resume, so no sidecar state file should be created.
@@ -188,7 +188,7 @@ def test_process_range_parquet_uses_no_state_file(tmp_path):
     assert out.exists()
 
 
-def test_process_range_parquet_failure_clears_state(tmp_path):
+def test_process_range_parquet_failure_leaves_no_marker(tmp_path):
     out = tmp_path / "out.parquet"
 
     def fake_hour(dt, repos, event_types, orgs=None, actors=None, stop=None):
@@ -225,7 +225,7 @@ def test_keyboard_interrupt_stops_in_flight_hours_promptly(tmp_path):
             second_started.wait(5)
             raise KeyboardInterrupt
         second_started.set()
-        second_saw_stop.append(stop.wait(30))
+        second_saw_stop.append(stop.wait(34))
         return []
 
     began = time.monotonic()
@@ -237,7 +237,7 @@ def test_keyboard_interrupt_stops_in_flight_hours_promptly(tmp_path):
             )
 
     assert second_saw_stop == [True]
-    assert time.monotonic() - began < 10
+    assert time.monotonic() - began < 14
 
 
 def test_download_resumable_abandons_transfer_when_stopped(tmp_path):

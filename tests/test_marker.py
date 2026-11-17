@@ -60,7 +60,7 @@ def test_mark_done_writes_atomically_leaving_no_temp(tmp_path):
     json.loads(state_file.read_text(encoding="utf-8"))
 
 
-def test_clear_removes_state_file(tmp_path):
+def test_clear_removes_marker_file(tmp_path):
     out = tmp_path / "events.jsonl"
     marker = _RunMarker(str(out), make_fp())
     marker.mark_done(datetime(2024, 1, 1, 0))
@@ -71,7 +71,7 @@ def test_clear_removes_state_file(tmp_path):
     assert not state_file.exists()
 
 
-def test_unreadable_state_file_starts_fresh(tmp_path):
+def test_unreadable_marker_file_starts_fresh(tmp_path):
     out = tmp_path / "events.jsonl"
     state_file = tmp_path / "events.jsonl.state.json"
     state_file.write_text("{not valid json")
