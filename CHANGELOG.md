@@ -31,6 +31,13 @@ follows [Semantic Versioning](https://semver.org/).
   by `prefilter_groups` and `passes_prefilter`.
 - `process_range` queues two hours per worker at a time instead of the whole
   window, so its memory and polling cost no longer grow with window length.
+- Error messages share one form: lowercase, leading with what was expected or
+  what failed. The download failure hint names the `--debug` flag.
+- CI covers Python 3.10 through 3.14 on Linux plus Windows, with orjson
+  installed so both JSON parsing paths are tested.
+- The package declares its license as the SPDX expression `MIT` and builds
+  with setuptools 77 or newer, replacing the license table and classifier
+  that setuptools stops supporting on 2027-02-18.
 
 ## [0.1.5] - 2026-08-25
 
