@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+- The paper (`paper/`, its PDFs and the Paper workflow). The architecture
+  figure used by the README moves to `docs/`, and software citation through
+  `CITATION.cff` and the Zenodo DOIs is unchanged.
+
 ### Fixed
 - `gharc convert` no longer deletes its input when given the same path for
   input and output; the conversion is refused instead. A conversion that fails
@@ -33,8 +38,12 @@ follows [Semantic Versioning](https://semver.org/).
   window, so its memory and polling cost no longer grow with window length.
 - Error messages share one form: lowercase, leading with what was expected or
   what failed. The download failure hint names the `--debug` flag.
+- `examples/orchestrator.py` accepts and forwards `--orgs` and `--actors`, and
+  needs at least one of `--repos`, `--orgs` or `--actors`.
 - CI covers Python 3.10 through 3.14 on Linux plus Windows, with orjson
   installed so both JSON parsing paths are tested.
+- The source distribution no longer bundles the paper, benchmarks or CI
+  configuration, which brings it from about 459 KB to 39 KB.
 - The package declares its license as the SPDX expression `MIT` and builds
   with setuptools 77 or newer, replacing the license table and classifier
   that setuptools stops supporting on 2027-02-18.
