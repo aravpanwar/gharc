@@ -34,7 +34,7 @@ It is meant for researchers and students who need event-level GitHub data over l
 * **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 250 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
 * **Resumable downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
 * **Parallel processing:** Hours in the range are downloaded and filtered across a thread pool.
-* **Filtering before parsing:** A byte-level token check rejects lines that cannot match before any JSON parsing. A line has to contain a token from every filter you set, so pairing a repository with a common event type stays selective. With a selective filter most lines never reach the parser; a wide or empty filter gains nothing from this.
+* **Filtering before parsing:** A byte-level token check rejects lines that cannot match before any JSON parsing. A line has to contain a token from each kind of filter you set (repositories and owners count as one), so pairing a repository with a common event type stays selective. With a selective filter most lines never reach the parser; a wide or empty filter gains nothing from this.
 * **Optional orjson:** Uses `orjson` for JSON parsing when it is installed, which is faster than the standard library parser.
 * **Parquet output:** Writes columnar data that loads directly into pandas, Polars, or Spark. JSONL output is available for resumable runs and line-oriented tools.
 
