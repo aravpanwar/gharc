@@ -1,7 +1,7 @@
 """Run gharc month-by-month over a long date range.
 
 Useful when you're working on a laptop and want one Parquet file per month
-rather than one giant file. Pass the date range, repositories, and output
+rather than one giant file. Pass the date range, filters, and output
 directory as command-line flags, for example:
 
     python examples/orchestrator.py --start 2023-01-01 --end 2024-01-01 \\
@@ -30,11 +30,17 @@ def main():
     p = argparse.ArgumentParser(description="Run gharc month-by-month.")
     p.add_argument("--start", required=True, help="Start date YYYY-MM-DD")
     p.add_argument("--end", required=True, help="End date YYYY-MM-DD (exclusive)")
-    p.add_argument("--repos", required=True, help="Comma-separated repos")
+    p.add_argument("--repos", help="Comma-separated repos; owner/* wildcards allowed")
+    p.add_argument("--orgs", help="Comma-separated repository owners")
+    p.add_argument("--actors", help="Comma-separated actor logins")
     p.add_argument("--event-types", help="Comma-separated event types (optional)")
     p.add_argument("--output-dir", default="./gharc_out", help="Output directory")
     p.add_argument("--workers", type=int, default=4)
     args = p.parse_args()
+    # Without a repository, owner or actor filter every month would pull the
+    # whole archive, which is never what a month-by-month batch is for.
+    if not (args.repos or args.orgs or args.actors):
+        p.error("expected at least one of --repos, --orgs or --actors")
 
     start = datetime.strptime(args.start, "%Y-%m-%d")
     end = datetime.strptime(args.end, "%Y-%m-%d")
@@ -61,12 +67,17 @@ def main():
             "gharc", "download",
             "--start", s_str,
             "--end", e_str,
-            "--repos", args.repos,
             "--output", jsonl_file,
             "--workers", str(args.workers),
         ]
-        if args.event_types:
-            download_cmd += ["--event-types", args.event_types]
+        for flag, value in (
+            ("--repos", args.repos),
+            ("--orgs", args.orgs),
+            ("--actors", args.actors),
+            ("--event-types", args.event_types),
+        ):
+            if value:
+                download_cmd += [flag, value]
 
         try:
             subprocess.run(download_cmd, check=True)
