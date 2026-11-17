@@ -8,7 +8,7 @@ SAMPLE_EVENTS = [
     {
         "id": "1",
         "type": "PushEvent",
-        "actor": {"id": 100, "login": "alice"},
+        "actor": {"id": "34-4407", "login": "gustav-victor"},
         "repo": {"id": 1, "name": "apache/spark"},
         "payload": {"size": 1, "ref": "refs/heads/master"},
         "created_at": "2024-01-01T00:00:00Z",

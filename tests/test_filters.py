@@ -60,10 +60,10 @@ def test_passes_filters_actors():
     event = {
         "repo": {"name": "apache/spark"},
         "type": "PushEvent",
-        "actor": {"login": "dongjoon-hyun"},
+        "actor": {"login": "gustav-victor"},
     }
 
-    assert passes_filters(event, actors=["dongjoon-hyun"]) is True
+    assert passes_filters(event, actors=["gustav-victor"]) is True
     assert passes_filters(event, actors=["someone-else"]) is False
 
 
@@ -71,7 +71,7 @@ def test_passes_filters_groups_are_anded():
     event = {
         "repo": {"name": "apache/spark"},
         "type": "PushEvent",
-        "actor": {"login": "dongjoon-hyun"},
+        "actor": {"login": "gustav-victor"},
     }
 
     # Repo matches but the type does not, so the event is rejected.

@@ -34,7 +34,7 @@ def test_download_passes_parsed_filters_to_process_range():
         result = CliRunner().invoke(main, [
             "download", "--start", "2024-01-01", "--end", "2024-01-02",
             "--repos", "apache/spark, ,apache/*", "--orgs", "pandas-dev",
-            "--actors", "bob", "--event-types", "PushEvent",
+            "--actors", "gustav-victor", "--event-types", "PushEvent",
             "--output", "out.jsonl", "--workers", "2",
         ])
 
@@ -46,7 +46,7 @@ def test_download_passes_parsed_filters_to_process_range():
     assert args[4] == "out.jsonl"
     assert args[5] == 2
     assert kwargs["orgs"] == ["pandas-dev"]
-    assert kwargs["actors"] == ["bob"]
+    assert kwargs["actors"] == ["gustav-victor"]
 
 
 def test_download_keyboard_interrupt_exits_130():
