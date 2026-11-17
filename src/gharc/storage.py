@@ -1,6 +1,7 @@
 # src/gharc/storage.py
 import json
 import os
+import tempfile
 import pyarrow as pa
 import pyarrow.parquet as pq
 from .utils import logger
@@ -178,8 +179,14 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
     # Build the Parquet file beside the destination and rename it into place
     # only once it is complete, so a conversion that fails partway (a full
     # disk, an interrupt) leaves any earlier output untouched instead of
-    # having already deleted it.
-    tmp_path = output_path + ".tmp"
+    # having already deleted it. The temporary name is unique so it can never
+    # be the input or another file the user keeps beside the output.
+    fd, tmp_path = tempfile.mkstemp(
+        dir=os.path.dirname(os.path.abspath(output_path)),
+        prefix=os.path.basename(output_path) + ".",
+        suffix=".tmp",
+    )
+    os.close(fd)
     writer = None
     buffer = []
     rows_written = 0
@@ -221,16 +228,20 @@ def jsonl_to_parquet(input_path: str, output_path: str, batch_size: int = 10000)
             # Input had no usable rows. Still emit a valid empty Parquet file
             # so the output exists and reads back as a 0-row table.
             pq.write_table(EVENT_SCHEMA.empty_table(), tmp_path, compression='snappy')
+
+        if writer is not None:
+            writer.close()
+            writer = None
+        # The rename stays inside the cleanup so a destination that cannot be
+        # replaced (open in another program on Windows, or a directory) does
+        # not leave a full-size temporary file behind.
+        os.replace(tmp_path, output_path)
     except BaseException:
         if writer is not None:
             writer.close()
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         raise
-
-    if writer is not None:
-        writer.close()
-    os.replace(tmp_path, output_path)
 
     logger.info(f"Converted {rows_written:,} rows from {input_path} to {output_path}")
     return rows_written

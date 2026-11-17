@@ -315,7 +315,7 @@ def test_jsonl_to_parquet_failure_keeps_previous_output(tmp_path, monkeypatch):
         storage.jsonl_to_parquet(str(jsonl_path), str(parquet_path))
 
     assert parquet_path.read_bytes() == before
-    assert not (tmp_path / "events.parquet.tmp").exists()
+    assert not list(tmp_path.glob("*.tmp"))
 
 
 def test_jsonl_to_parquet_rejects_non_positive_batch_size(tmp_path):
@@ -326,3 +326,40 @@ def test_jsonl_to_parquet_rejects_non_positive_batch_size(tmp_path):
 
     with pytest.raises(ValueError, match="at least 1"):
         jsonl_to_parquet(str(jsonl_path), str(tmp_path / "out.parquet"), batch_size=0)
+
+
+def test_jsonl_to_parquet_keeps_an_input_named_like_a_temp_file(tmp_path):
+    from gharc.storage import jsonl_to_parquet
+
+    # Earlier builds wrote to <output>.tmp, which destroyed an input with
+    # exactly that name partway through the conversion.
+    jsonl_path = tmp_path / "events.parquet.tmp"
+    with jsonl_path.open("w", encoding="utf-8") as f:
+        for i in range(500):
+            f.write(json.dumps({**SAMPLE_EVENTS[0], "id": str(i)}) + "\n")
+
+    rows = jsonl_to_parquet(str(jsonl_path), str(tmp_path / "events.parquet"), batch_size=100)
+
+    assert rows == 500
+    assert jsonl_path.exists()
+    assert pq.read_table(str(tmp_path / "events.parquet")).num_rows == 500
+
+
+def test_jsonl_to_parquet_failed_replace_leaves_no_temp_file(tmp_path, monkeypatch):
+    from gharc import storage
+
+    jsonl_path = tmp_path / "events.jsonl"
+    parquet_path = tmp_path / "events.parquet"
+    jsonl_path.write_text(json.dumps(SAMPLE_EVENTS[0]) + "\n", encoding="utf-8")
+    storage.jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+    before = parquet_path.read_bytes()
+
+    def locked(_src, _dst):
+        raise PermissionError("destination is open in another program")
+
+    monkeypatch.setattr(storage.os, "replace", locked)
+    with pytest.raises(PermissionError):
+        storage.jsonl_to_parquet(str(jsonl_path), str(parquet_path))
+
+    assert parquet_path.read_bytes() == before
+    assert not list(tmp_path.glob("*.tmp"))
