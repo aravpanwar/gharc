@@ -108,7 +108,7 @@ A three-hour run with JSONL output, then the conversion to Parquet:
 ### Advanced Filtering
 
 Filter for multiple repositories and specific event types (e.g., only Pull Requests and Pushes).
-This covers all of June 2023 (June 1 inclusive through July 1 exclusive).
+This covers all of June 2023 (June 1 inclusive through July 1 exclusive), so it writes JSONL to stay resumable and converts at the end.
 
 ```bash
 gharc download \
@@ -116,9 +116,10 @@ gharc download \
     --end 2023-07-01 \
     --repos "apache/spark, pandas-dev/pandas, pytorch/pytorch" \
     --event-types "PullRequestEvent, PushEvent" \
-    --output oss_summer_2023.parquet \
+    --output oss_summer_2023.jsonl \
     --workers 4
 
+gharc convert oss_summer_2023.jsonl oss_summer_2023.parquet
 ```
 
 ### Arguments
@@ -153,6 +154,8 @@ Resume support requires JSONL output. Parquet writers cannot append to a closed 
 ```bash
 gharc convert run.jsonl run.parquet
 ```
+
+`convert` streams the JSONL file rather than loading it, writing Parquet row groups of `--batch-size` rows (default 10,034), and only replaces an existing output once the new file is complete.
 
 ---
 
@@ -200,6 +203,8 @@ python examples/orchestrator.py \
     --workers 4
 ```
 
+It also takes `--orgs`, `--actors` and `--event-types`, and needs at least one of `--repos`, `--orgs` or `--actors`. Each month is downloaded to JSONL and then converted, so rerunning after a crash resumes the unfinished month and skips months already written.
+
 ---
 
 ## Repository Layout
@@ -246,10 +251,12 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
   author = {Panwar, Arav},
   title = {gharc: A stream-and-filter tool for the GitHub Archive},
   year = {2026},
+  doi = {10.5281/zenodo.19814232},
   url = {https://github.com/aravpanwar/gharc}
 }
-
 ```
+
+The DOI above always resolves to the latest archived release; each release also has its own DOI, listed in `CITATION.cff`.
 
 ---
 
