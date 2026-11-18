@@ -8,19 +8,7 @@
 
 **Pull filtered slices of the GitHub Archive on a laptop, without holding raw hours on disk.**
 
-`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset. Each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by the downloads in flight at once, one temporary file per worker (each hourly archive is roughly 60 to 150 MB in 2024), so disk use scales with `--workers` rather than with how long a window you process.
-
----
-
-## Why gharc?
-
-The full GitHub Archive spans every public event since 2011: tens of terabytes compressed, and several petabytes uncompressed. Most studies need only a small slice of it, but the archive has no server-side filtering, so the usual options are downloading whole hours to local disk or querying a cloud-warehouse mirror (BigQuery, Snowflake).
-
-`gharc` takes a third route and filters during the download:
-1.  **Streaming:** Downloads each hourly archive (~60 to 150 MB compressed in 2024) to a temporary file.
-2.  **Filtering:** Keeps only the events matching your filters (repositories, owners, actors, event types).
-3.  **Writing:** Appends the matches to a single **Parquet** file (through `pyarrow.ParquetWriter`) or **JSONL** file.
-4.  **Cleanup:** Deletes the temporary download before moving to the next hour, so disk usage never accumulates.
+`gharc` is a command-line tool and Python library that filters the [GitHub Archive](https://www.gharchive.org/) dataset. The archive holds every public GitHub event since 2011, several terabytes even compressed, and has no server-side filtering, so the usual options are downloading whole hours to disk or querying a warehouse mirror such as BigQuery. `gharc` filters during the download instead: each hourly archive is streamed through memory, filtered against your criteria, and written out as Parquet or JSONL. Peak local storage stays bounded by the downloads in flight at once, one temporary file per worker (each hourly archive is roughly 60 to 150 MB in 2024), so disk use scales with `--workers` rather than with how long a window you process.
 
 It is meant for researchers and students who need event-level GitHub data over long windows but do not have a warehouse account or the disk to hold raw months.
 
