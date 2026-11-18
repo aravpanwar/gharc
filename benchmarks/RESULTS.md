@@ -11,7 +11,8 @@ reproduce them within reasonable variance.
 
 - OS: Windows 11 Home
 - CPU: 12 logical cores
-- RAM: 15.3 GB total
+- RAM: 16 GB installed, 15.3 GB usable by Windows (the rest is reserved for
+  hardware); the benchmark scripts record the usable figure
 - Python 3.11.9, pyarrow 26.0.1, orjson installed
 
 ## Smoke test (`smoke.py`)

@@ -41,7 +41,7 @@ It is meant for researchers and students who need event-level GitHub data over l
 
 ## Performance
 
-Measured on 2026-11-18 at v0.2.0 on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a typical residential connection. Reproducible scripts and the full results, including a same-night comparison with v0.1.5, are in [`benchmarks/`](benchmarks/RESULTS.md).
+Measured on 2026-11-18 at v0.2.0 on a Windows 11 laptop (12 logical cores, 16 GB RAM) over a typical residential connection. Reproducible scripts and the full results, including a same-night comparison with v0.1.5, are in [`benchmarks/`](benchmarks/RESULTS.md).
 
 A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apache/spark` (mean of two runs):
 
