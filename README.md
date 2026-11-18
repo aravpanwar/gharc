@@ -228,6 +228,14 @@ gharc/
 
 ---
 
+## Support and maintenance
+
+`gharc` is maintained by one person, Arav Panwar. Questions and bug reports go to the [issue tracker](https://github.com/aravpanwar/gharc/issues); for a bug, include the command you ran and the output with `--debug`, which prints the full traceback. Problems that could leave downloaded data wrong or incomplete are fixed first.
+
+Releases follow [Semantic Versioning](https://semver.org/). Every release is listed in the [changelog](CHANGELOG.md), published to PyPI, and archived on Zenodo with its own DOI.
+
+---
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on the process for submitting pull requests.
