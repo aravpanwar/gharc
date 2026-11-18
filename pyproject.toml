@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gharc"
 dynamic = ["version"]
-description = "A stream-processing tool for GitHub Archive data filtering."
+description = "Pull filtered slices of the GitHub Archive without holding raw hours on disk."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -41,6 +41,7 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/aravpanwar/gharc"
 "Bug Tracker" = "https://github.com/aravpanwar/gharc/issues"
+"Changelog" = "https://github.com/aravpanwar/gharc/blob/main/CHANGELOG.md"
 
 [project.scripts]
 gharc = "gharc.cli:main"

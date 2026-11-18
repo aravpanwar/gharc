@@ -59,6 +59,8 @@ follows [Semantic Versioning](https://semver.org/).
 - The citation title and abstract (`CITATION.cff`, and the README BibTeX
   example) drop "on commodity hardware", which only restated what the
   README already says plainly.
+- The PyPI summary matches the README tagline, and the project links include
+  the changelog.
 
 ## [0.1.5] - 2026-08-25
 
