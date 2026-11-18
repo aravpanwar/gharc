@@ -269,6 +269,3 @@ If you use `gharc` in your research, please cite it using the metadata in `CITAT
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Created by Arav Panwar
-[aravpanwar.com](https://www.aravpanwar.com)
-
