@@ -56,6 +56,9 @@ follows [Semantic Versioning](https://semver.org/).
 - The package declares its license as the SPDX expression `MIT` and builds
   with setuptools 77 or newer, replacing the license table and classifier
   that setuptools stops supporting on 2027-02-18.
+- The citation title and abstract (`CITATION.cff`, and the README BibTeX
+  example) drop "on commodity hardware", which only restated what the
+  README already says plainly.
 
 ## [0.1.5] - 2026-08-25
 
