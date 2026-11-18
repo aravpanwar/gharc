@@ -1,19 +1,18 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
-title: "gharc: A stream-and-filter tool for the GitHub Archive on commodity hardware"
+title: "gharc: A stream-and-filter tool for the GitHub Archive"
 abstract: >-
-  gharc filters the GitHub Archive on commodity hardware by streaming
-  each hourly archive through memory and writing only matching events
-  to Parquet or JSONL. Peak local storage stays bounded by the downloads
-  in flight at once, one temporary file per worker, rather than by the
-  time range processed.
+  gharc filters the GitHub Archive by streaming each hourly archive
+  through memory and writing only matching events to Parquet or JSONL.
+  Peak local storage stays bounded by the downloads in flight at once,
+  one temporary file per worker, rather than by the time range processed.
 authors:
   - family-names: Panwar
     given-names: Arav
     orcid: https://orcid.org/0009-0009-3013-5970
-version: 0.1.5
-date-released: 2026-08-25
+version: 0.2.0
+date-released: 2026-11-18
 license: MIT
 repository-code: https://github.com/aravpanwar/gharc
 doi: 10.5281/zenodo.19814232

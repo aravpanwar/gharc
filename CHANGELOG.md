@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-18
+
+### Added
+- The benchmarks are re-measured for this release, side by side with v0.1.5
+  on the same night, and the README performance section records a four-month
+  re-validation (January to April 2024, 2,904 hourly files) that recovered
+  exactly the events of the published 0.1.4 run in every month.
+
 ### Removed
 - The paper (`paper/`, its PDFs and the Paper workflow). The architecture
   figure used by the README moves to `docs/`, and software citation through
@@ -50,6 +58,11 @@ follows [Semantic Versioning](https://semver.org/).
 - The package declares its license as the SPDX expression `MIT` and builds
   with setuptools 77 or newer, replacing the license table and classifier
   that setuptools stops supporting on 2027-02-18.
+- The citation title and abstract (`CITATION.cff`, and the README BibTeX
+  example) drop "on commodity hardware", which only restated what the
+  README already says plainly.
+- The PyPI summary matches the README tagline, and the project links include
+  the changelog.
 
 ## [0.1.5] - 2026-08-25
 
@@ -193,6 +206,7 @@ follows [Semantic Versioning](https://semver.org/).
 - JOSS-style paper draft under `paper/`.
 - MIT license, CITATION.cff, Zenodo deposit.
 
+[0.2.0]: https://github.com/aravpanwar/gharc/releases/tag/v0.2.0
 [0.1.5]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.5
 [0.1.4]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.4
 [0.1.3]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.3
