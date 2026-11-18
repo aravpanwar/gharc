@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- The benchmarks are re-measured for this release, side by side with v0.1.5
+  on the same night, and the README performance section records a four-month
+  re-validation (January to April 2024, 2,904 hourly files) that recovered
+  exactly the events of the published 0.1.4 run in every month.
+
 ### Removed
 - The paper (`paper/`, its PDFs and the Paper workflow). The architecture
   figure used by the README moves to `docs/`, and software citation through

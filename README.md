@@ -30,7 +30,7 @@ It is meant for researchers and students who need event-level GitHub data over l
 
 ## Key Features
 
-* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (about 290 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays near 100 MB; a very wide or empty filter buffers more of each hour and uses more.
+* **Bounded disk:** Peak local storage is the downloads in flight, one temporary file per worker (roughly 225 to 290 MB at the default 4 workers, about 85 MB with a single worker), and it does not grow with the length of the window. For selective filters the working memory stays under about 100 MB (52 to 70 MB in the latest benchmarks); a very wide or empty filter buffers more of each hour and uses more.
 * **Resumable downloads:** Recovers from network interruptions (common on residential connections) using HTTP Range requests.
 * **Parallel processing:** Hours in the range are downloaded and filtered across a thread pool.
 * **Filtering before parsing:** A byte-level token check rejects lines that cannot match before any JSON parsing. A line has to contain a token from each kind of filter you set (repositories and owners count as one), so pairing a repository with a common event type stays selective. With a selective filter most lines never reach the parser; a wide or empty filter gains nothing from this.
@@ -41,20 +41,22 @@ It is meant for researchers and students who need event-level GitHub data over l
 
 ## Performance
 
-Measured on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a typical residential connection. Reproducible scripts in [`benchmarks/`](benchmarks/).
+Measured on 2026-11-18 at v0.2.0 on a Windows 11 laptop (12 logical cores, 15 GB RAM) over a typical residential connection. Reproducible scripts and the full results, including a same-night comparison with v0.1.5, are in [`benchmarks/`](benchmarks/RESULTS.md).
 
-A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apache/spark`:
+A six-hour window of GHArchive (2024-01-01 00:00 to 06:00 UTC), filtered to `apache/spark` (mean of two runs):
 
 | Workers | Wall-clock | Hours/sec | Spark events | Peak RSS |
 |---|---|---|---|---|
-| 1 | 45.6 s | 0.132 | 14 | 98.7 MB |
-| 4 | 21.1 s | 0.285 | 14 | 112.6 MB |
+| 1 | 52.7 s | 0.114 | 14 | 52.6 MB |
+| 4 | 42.1 s | 0.143 | 14 | 70.2 MB |
 
-Both runs recovered the same events, so concurrency does not affect output. Peak RSS stays below 115 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection.
+Every run recovered the same events, so concurrency does not affect output. Peak RSS stays well under 100 MB. The bottleneck on residential links is HTTPS download throughput rather than CPU; additional workers help up to a point and then saturate the connection, which on a slow night (as here) leaves four workers only about 1.3x ahead of one.
 
-Across the same six-hour window gharc streams about 416 MB of compressed source from GHArchive (six hourly files of roughly 60 to 85 MB each) but never retains it. The full source is still transferred, so this is not a bandwidth saving; what stays bounded is local disk. Peak disk is held to the temporary files in flight, one per worker: about 85 MB with a single worker and about 290 MB at the default four workers. The filtered Parquet output for `apache/spark` over that window is 62 KB, and local disk does not grow with the length of the window processed.
+Across the same six-hour window gharc streams about 416 MB of compressed source from GHArchive (six hourly files of roughly 60 to 85 MB each) but never retains it. The full source is still transferred, so this is not a bandwidth saving; what stays bounded is local disk. Peak disk is held to the temporary files in flight, one per worker: about 85 MB with a single worker and roughly 225 to 290 MB at the default four workers, depending on which hours overlap. The filtered Parquet output for `apache/spark` over that window is 62 KB, and local disk does not grow with the length of the window processed.
 
-At full scale: a six-month window (January to June 2024, 4,368 hourly files, roughly 350 GB of compressed source) filtered to `apache/spark` completed in 11 h 16 min on the same laptop over a residential connection, with peak temporary disk of 565 MB and a 112 MB Parquet output. Peak in-flight disk runs higher than the six-hour benchmark suggests because hourly file sizes vary widely by time of day. The full reproduction, including a comparison against the study it reproduces, is at [Spark_Codebase_Evolution](https://github.com/aravpanwar/Spark_Codebase_Evolution/tree/main/redo).
+At full scale: a six-month window (January to June 2024, 4,368 hourly files, roughly 350 GB of compressed source) filtered to `apache/spark` completed in 11 h 16 min on the same laptop over a residential connection with gharc 0.1.4, with peak temporary disk of 565 MB and a 112 MB Parquet output. Peak in-flight disk runs higher than the six-hour benchmark suggests because hourly file sizes vary widely by time of day. The full reproduction, including a comparison against the study it reproduces, is at [Spark_Codebase_Evolution](https://github.com/aravpanwar/Spark_Codebase_Evolution/tree/main/redo).
+
+Re-running the first four months of that window (2,904 hourly files) at v0.2.0 recovered exactly the same number of events in every month, 28,049 in total, in 6 h 49 min with peak temporary disk of 576 MB. The month-by-month comparison is in [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md#four-month-re-validation).
 
 ---
 
