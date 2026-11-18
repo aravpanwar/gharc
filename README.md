@@ -113,6 +113,10 @@ gharc download \
 
 For multi-hour or multi-day runs, prefer `--output run.jsonl` so the run can resume from where it left off if it crashes; convert to Parquet at the end with `gharc convert run.jsonl run.parquet`. See [Resumable runs](#resumable-runs) below for details.
 
+A three-hour run with JSONL output, then the conversion to Parquet:
+
+![Terminal capture: gharc download of three hours of apache/spark pull request and comment events with three workers, a progress bar reaching 3 of 3 hours, then gharc convert reporting 13 rows written to spark.parquet.](docs/cli-download.svg)
+
 ### Advanced Filtering
 
 Filter for multiple repositories and specific event types (e.g., only Pull Requests and Pushes).
@@ -145,6 +149,10 @@ gharc download \
 Dates are interpreted as UTC, matching GHArchive's hourly file naming.
 
 Repository names are matched exactly and are case-sensitive, so pass the canonical `owner/name` as it appears on GitHub (for example `apache/spark`). Use `apache/*` or `--orgs apache` to keep every repository under an owner. `--repos` and `--orgs` are combined (an event is kept if it matches either), while `--event-types` and `--actors` further narrow the result.
+
+Invalid arguments stop the run before anything is downloaded, with a message that says what was expected:
+
+![Terminal capture: gharc rejecting a start date after the end date, a worker count of zero, and a convert whose input and output are the same file, each with a one-line error.](docs/cli-errors.svg)
 
 ---
 
@@ -185,6 +193,10 @@ gharc.jsonl_to_parquet("spark_one_day.jsonl", "spark_one_day.parquet")
 
 `__all__` in `gharc/__init__.py` lists the public surface (`process_range`, `jsonl_to_parquet`, `DataWriter`, `parse_date`, `date_range`, `get_url_for_time`, `setup_logging`, plus the filter helpers).
 
+The nested event fields (`actor`, `repo`, `payload`, `org`) are stored as JSON strings, so the output loads directly into pandas, Polars or Spark and the nested parts parse with `json.loads`:
+
+![Terminal capture: a short pandas script reading spark.parquet, pulling the action out of each payload, and printing the first six events and a count of 13 events by type.](docs/cli-pandas.svg)
+
 ---
 
 ## Automating Bulk Downloads
@@ -210,7 +222,7 @@ gharc/
 ├── tests/            # pytest test suite
 ├── benchmarks/       # Reproducible runs that back the performance claims
 ├── examples/         # Driver scripts (e.g. month-by-month orchestrator)
-├── docs/             # Architecture figure and its Mermaid source
+├── docs/             # Architecture figure and the README's terminal captures
 └── CITATION.cff      # GitHub-detectable citation metadata
 ```
 
