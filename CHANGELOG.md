@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-18
+
 ### Added
 - The benchmarks are re-measured for this release, side by side with v0.1.5
   on the same night, and the README performance section records a four-month
@@ -204,6 +206,7 @@ follows [Semantic Versioning](https://semver.org/).
 - JOSS-style paper draft under `paper/`.
 - MIT license, CITATION.cff, Zenodo deposit.
 
+[0.2.0]: https://github.com/aravpanwar/gharc/releases/tag/v0.2.0
 [0.1.5]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.5
 [0.1.4]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.4
 [0.1.3]: https://github.com/aravpanwar/gharc/releases/tag/v0.1.3
